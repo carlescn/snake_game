@@ -74,7 +74,10 @@ class Snake:
         self.growing = False
 
     def change_direction(self, new_direction):
-        if (self.direction + new_direction == 0).all():
+        # if (self.direction + new_direction == 0).all():
+        # does'n work because you can change directions two times before the snake moves
+        new_position = self.blocks[0].position + new_direction
+        if (new_position == self.blocks[1].position).all():
             return
         self.direction = new_direction
         self.moving = True
