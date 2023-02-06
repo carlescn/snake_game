@@ -20,19 +20,21 @@ START_Y         = GRID_H//2
 START_LENGTH    = 3
 START_DIRECTION = RIGHT
 
-BACKGROUND_COLOR = pygame.color.Color('moccasin')
-FOOD_COLOR       = pygame.color.Color('red')
-SNAKE_HEAD_COLOR = pygame.color.Color('green4')
-SNAKE_BODY_COLOR = pygame.color.Color('green3')
+BACKGROUND_COLOR = pygame.Color('moccasin')
+FOOD_COLOR       = pygame.Color('red')
+SNAKE_HEAD_COLOR = pygame.Color('green4')
+SNAKE_BODY_COLOR = pygame.Color('green3')
 
 class Block:
     def __init__(self, x, y, color, circle=False):
+    # pylint:disable=invalid-name  # doesn't like single letter x, y
         self.position = np.array((x, y))
         self.rect = pygame.rect.Rect(x * CELL, y * CELL, CELL, CELL)
         self.color = color
         self.circle = circle
 
     def move(self, x, y):
+    # pylint:disable=invalid-name  # doesn't like single letter x, y
         self.position = (x, y)
         self.rect.x = x * CELL
         self.rect.y = y * CELL
@@ -48,6 +50,7 @@ class Food:
         self.block = Block(0, 0, FOOD_COLOR, circle = True)
 
     def move(self):
+    # pylint:disable=invalid-name  # doesn't like single letter x, y
         x = random.randint(0, GRID_W -1)
         y = random.randint(0, GRID_H -1)
         self.block.move(x, y)
@@ -64,6 +67,7 @@ class Snake:
         self.restart()
 
     def move(self):
+    # pylint:disable=invalid-name  # doesn't like single letter x, y
         if not self.moving:
             return
         if not self.growing:
@@ -75,7 +79,7 @@ class Snake:
 
     def change_direction(self, new_direction):
         # if (self.direction + new_direction == 0).all():
-        # does'n work because you can change directions two times before the snake moves
+        # does'n work: you can change directions two times it moves
         new_position = self.blocks[0].position + new_direction
         if (new_position == self.blocks[1].position).all():
             return
@@ -140,7 +144,9 @@ class Game:
         score = len(self.snake.blocks) - START_LENGTH
         if score > self.high_score:
             self.high_score = score
-        pygame.display.set_caption(f'Snake - Score = {score:d} (High score: {self.high_score:d})')
+        pygame.display.set_caption(
+            f'Snake - Score = {score:d} (High score: {self.high_score:d})'
+        )
 
     def update(self):
         if self.snake.moving:
@@ -159,7 +165,7 @@ class Game:
 pygame.init()
 screen = pygame.display.set_mode((GRID_W * CELL, GRID_H * CELL))
 clock  = pygame.time.Clock()
-timer  = pygame.USEREVENT
+timer  = pygame.USEREVENT  # pylint:disable=invalid-name  # lower case
 pygame.time.set_timer(timer, GAME_SPEED)
 game   = Game()
 while True:
