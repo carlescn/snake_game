@@ -51,7 +51,7 @@ SNAKE_TURN  = ((0, 0, 0, 0),
                (0, 1, 0, 1),
                (0, 1, 1, 0))
 
-def check_sprites_size():
+def _check_sprites_size():
     for sprite in (FOOD_SPRITE, SNAKE_HEAD, SNAKE_BODY, SNAKE_TAIL):
         assert np.array(sprite).shape[0] == SPRITE_SIZE
         assert np.array(sprite).shape[1] == SPRITE_SIZE
@@ -138,12 +138,9 @@ class Snake:
         self.direction = START_DIRECTION
         self._directions = [START_DIRECTION,] * START_LENGTH
         self.growing = False
-        self.moving = False
 
     def move(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        if not self.moving:
-            return
         if not self.growing:
             self._directions.pop(-1)
             self.positions.pop(-1)
@@ -152,23 +149,10 @@ class Snake:
         self.positions.insert(0, self.positions[0] + self.direction)
         self.growing = False
 
-    # TODO: add buffer
-    def change_direction(self, new_direction):
-        # if (self._directions[0] + new_direction == 0).all():
-        # does'n work: you can change directions two times it moves
-        new_position = self.positions[0] + new_direction
-        if (new_position == self.positions[1]).all():
-            return
-        self.direction = new_direction
-        self.moving = True
-
     def grow(self):
         self.growing = True
 
-    def stop(self):
-        self.moving = False
-
-    def get_sprites(self):
+    def _get_sprites(self):
         head = Sprite(SNAKE_HEAD, self.positions[0], self._directions[0])
         if (self._directions[0] == LEFT).all():
             head.flip_v()
@@ -187,24 +171,34 @@ class Snake:
         return [head,] + body + [tail,]
 
     def draw(self):
-        for sprite in self.get_sprites():
+        for sprite in self._get_sprites():
             sprite.draw()
 
 
 class Game:
     def __init__(self):
+        self.pause = True
         self.high_score = 0
         self.food  = Food()
         self.snake = Snake()
         self.place_food()
 
+    def change_direction(self, new_direction):
+        # if (self._directions[0] + new_direction == 0).all():
+        # does'n work: you can change directions two times it moves
+        new_position = self.snake.positions[0] + new_direction
+        if (new_position == self.snake.positions[1]).all():
+            return
+        self.snake.direction = new_direction
+        self.pause = False
+
     def handle_input_key(self, key):
         match key:
-            case pygame.K_UP   : self.snake.change_direction(UP)
-            case pygame.K_DOWN : self.snake.change_direction(DOWN)
-            case pygame.K_LEFT : self.snake.change_direction(LEFT)
-            case pygame.K_RIGHT: self.snake.change_direction(RIGHT)
-            case pygame.K_SPACE: self.snake.stop()
+            case pygame.K_UP   : self.change_direction(UP)
+            case pygame.K_DOWN : self.change_direction(DOWN)
+            case pygame.K_LEFT : self.change_direction(LEFT)
+            case pygame.K_RIGHT: self.change_direction(RIGHT)
+            case pygame.K_SPACE: self.pause = not self.pause
 
     def check_collisions(self):
         new_position = self.snake.positions[0] + self.snake.direction
@@ -235,12 +229,14 @@ class Game:
         )
 
     def update(self):
-        if self.snake.moving:
-            self.check_collisions()
+        if self.pause:
+            return
+        self.check_collisions()
         self.snake.move()
         self.show_score()
 
     def game_over(self):
+        self.pause = True
         self.snake.restart()
         self.place_food()
 
@@ -250,7 +246,7 @@ class Game:
 
 
 # pylint:disable=invalid-name  # doesn't like lower case variables
-check_sprites_size()
+_check_sprites_size()
 
 pygame.init()
 screen_width = GRID_WIDTH * CELL_SIZE * SPRITE_SIZE
