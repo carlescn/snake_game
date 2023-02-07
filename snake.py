@@ -16,14 +16,14 @@ RIGHT = np.array(( 1,  0))
 CELL_SIZE    =  8                 # Size of one "fake pixel", in actual pixels
 BORDER_WIDTH =  1                 # Size of empty space between cells, in actual pixels
 SPRITE_SIZE  =  4 #(LEAVE AT 4!!) # Size of the sprites, in cells
-GRID_WIDTH   = 20                 # Width of the screen, in sprites
-GRID_HEIGHT  = 20                 # Height of the screen, in sprites
+GRID_WIDTH   = 16                 # Width of the screen, in sprites
+GRID_HEIGHT  =  9                 # Height of the screen, in sprites
 
-GAME_SPEED   = 120                # Time between updates in milliseconds
+GAME_SPEED   = 150                # Time between updates in milliseconds
 
 START_X         = GRID_WIDTH//3   # Starting X position
 START_Y         = GRID_HEIGHT//2  # Starting Y position
-START_LENGTH    = 3               # Starting size
+START_LENGTH    = 4               # Starting size
 START_DIRECTION = RIGHT           # Starting direction
 
 FOOD_SPRITE = ((0, 1, 0, 0),
@@ -31,15 +31,15 @@ FOOD_SPRITE = ((0, 1, 0, 0),
                (0, 1, 0, 0),
                (0, 0, 0, 0))
 
-SNAKE_HEAD  = ((0, 1, 0, 0),
-               (1, 0, 1, 1),
-               (1, 1, 1, 1),
+SNAKE_HEAD  = ((1, 0, 0, 0),
+               (0, 1, 1, 0),
+               (1, 1, 1, 0),
                (0, 0, 0, 0))
 
-SNAKE_MOUTH = ((0, 1, 0, 1),
-               (1, 0, 1, 0),
+SNAKE_MOUTH = ((1, 0, 1, 0),
+               (0, 1, 0, 0),
                (1, 1, 0, 0),
-               (0, 0, 1, 1))
+               (0, 0, 1, 0))
 
 SNAKE_BODY  = ((0, 0, 0, 0),
                (1, 1, 0, 1),
@@ -47,8 +47,8 @@ SNAKE_BODY  = ((0, 0, 0, 0),
                (0, 0, 0, 0))
 
 SNAKE_TAIL  = ((0, 0, 0, 0),
-               (0, 0, 1, 1),
-               (1, 1, 1, 1),
+               (0, 0, 0, 1),
+               (0, 1, 1, 1),
                (0, 0, 0, 0))
 
 SNAKE_TURN  = ((0, 0, 0, 0),
@@ -155,24 +155,47 @@ class Snake:
         self.positions.insert(0, self.positions[0] + self.direction)
         self.growing = False
 
-    def _get_sprites(self):
-        head_sprite = SNAKE_MOUTH if self.mouth_open else SNAKE_HEAD
-        head = Sprite(head_sprite, self.positions[0], self._directions[0])
+    def _get_head_sprite(self):
+        sprite = SNAKE_MOUTH if self.mouth_open else SNAKE_HEAD
+        head = Sprite(sprite, self.positions[0], self._directions[0])
         if (self._directions[0] == LEFT).all():
             head.flip_v()
+        if (self._directions[0] == DOWN).all():
+            head.flip_h()
+        return [head,]
+
+    def _get_tail_sprite(self):
         tail = Sprite(SNAKE_TAIL, self.positions[-1], self._directions[-1])
+        if (self._directions[-1] == LEFT).all():
+            tail.flip_v()
+        if (self._directions[-1] == DOWN).all():
+            tail.flip_h()
+        return [tail,]
+
+    def _get_body_sprites(self):
         body = []
         for i, position in enumerate(self.positions[1:-1]):
             sprite_dir   = self._directions[i+1]
             previous_dir = self._directions[i+2]
             if (sprite_dir == previous_dir).all():
-                body += [Sprite(SNAKE_BODY, position, sprite_dir),]
+                body_sprite = Sprite(SNAKE_BODY, position, sprite_dir)
+                if (sprite_dir == LEFT).all():
+                    body_sprite.flip_v()
+                if (sprite_dir == DOWN).all():
+                    body_sprite.flip_h()
+                body += [body_sprite,]
             else:
                 rotate_left=np.array(((0, -1), (1, 0)))
                 if (previous_dir.dot(rotate_left) == sprite_dir).all():
                     sprite_dir = sprite_dir.dot(rotate_left)
                 body += [Sprite(SNAKE_TURN, position, sprite_dir),]
-        return [head,] + body + [tail,]
+        return body
+    
+    def _get_sprites(self):
+        head = self._get_head_sprite()
+        body = self._get_body_sprites()
+        tail = self._get_tail_sprite()
+        return head + body + tail
 
     def draw(self):
         for sprite in self._get_sprites():
