@@ -19,7 +19,7 @@ SPRITE_SIZE  =  4 #(LEAVE AT 4!!) # Size of the sprites, in cells
 GRID_WIDTH   = 20                 # Width of the screen, in sprites
 GRID_HEIGHT  = 20                 # Height of the screen, in sprites
 
-GAME_SPEED = 120                  # Time between updates in milliseconds
+GAME_SPEED   = 120                # Time between updates in milliseconds
 
 START_X         = GRID_WIDTH//3   # Starting X position
 START_Y         = GRID_HEIGHT//2  # Starting Y position
@@ -182,23 +182,30 @@ class Game:
         self.food  = Food()
         self.snake = Snake()
         self.place_food()
+        self.direction_buffer = []
 
-    def change_direction(self, new_direction):
-        # if (self._directions[0] + new_direction == 0).all():
-        # does'n work: you can change directions two times it moves
-        new_position = self.snake.positions[0] + new_direction
-        if (new_position == self.snake.positions[1]).all():
+    def change_direction(self):
+        if len(self.direction_buffer) == 0:
             return
-        self.snake.direction = new_direction
+        if len(self.direction_buffer) > 2:
+            self.direction_buffer = self.direction_buffer[-2:]
+        direction = self.direction_buffer.pop(0)
+        # This does'n work because you could change directions two times before it moves:
+        # if (self.snake.direction + direction == 0).all():
+        if (self.snake.positions[0] + direction == self.snake.positions[1]).all():
+            return
+        self.snake.direction = direction
         self.pause = False
 
     def handle_input_key(self, key):
         match key:
-            case pygame.K_UP   : self.change_direction(UP)
-            case pygame.K_DOWN : self.change_direction(DOWN)
-            case pygame.K_LEFT : self.change_direction(LEFT)
-            case pygame.K_RIGHT: self.change_direction(RIGHT)
+            case pygame.K_UP   : self.direction_buffer += [UP,]
+            case pygame.K_DOWN : self.direction_buffer += [DOWN,]
+            case pygame.K_LEFT : self.direction_buffer += [LEFT,]
+            case pygame.K_RIGHT: self.direction_buffer += [RIGHT,]
             case pygame.K_SPACE: self.pause = not self.pause
+        if len(self.direction_buffer) > 0:
+            self.pause = False
 
     def check_collisions(self):
         new_position = self.snake.positions[0] + self.snake.direction
@@ -231,6 +238,7 @@ class Game:
     def update(self):
         if self.pause:
             return
+        self.change_direction()
         self.check_collisions()
         self.snake.move()
         self.show_score()
