@@ -36,6 +36,11 @@ SNAKE_HEAD  = ((0, 1, 0, 0),
                (1, 1, 1, 1),
                (0, 0, 0, 0))
 
+SNAKE_MOUTH = ((0, 1, 0, 1),
+               (1, 0, 1, 0),
+               (1, 1, 0, 0),
+               (0, 0, 1, 1))
+
 SNAKE_BODY  = ((0, 0, 0, 0),
                (1, 1, 0, 1),
                (1, 0, 1, 1),
@@ -129,7 +134,7 @@ class Snake:
         self.positions = None
         self.direction = None
         self.growing = None
-        self.moving = None
+        self.mouth_open = None
         self.restart()
 
     def restart(self):
@@ -138,6 +143,7 @@ class Snake:
         self.direction = START_DIRECTION
         self._directions = [START_DIRECTION,] * START_LENGTH
         self.growing = False
+        self.mouth_open = False
 
     def move(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
@@ -149,11 +155,9 @@ class Snake:
         self.positions.insert(0, self.positions[0] + self.direction)
         self.growing = False
 
-    def grow(self):
-        self.growing = True
-
     def _get_sprites(self):
-        head = Sprite(SNAKE_HEAD, self.positions[0], self._directions[0])
+        head_sprite = SNAKE_MOUTH if self.mouth_open else SNAKE_HEAD
+        head = Sprite(head_sprite, self.positions[0], self._directions[0])
         if (self._directions[0] == LEFT).all():
             head.flip_v()
         tail = Sprite(SNAKE_TAIL, self.positions[-1], self._directions[-1])
@@ -173,6 +177,15 @@ class Snake:
     def draw(self):
         for sprite in self._get_sprites():
             sprite.draw()
+
+    def grow(self):
+        self.growing = True
+
+    def open_mouth(self):
+        self.mouth_open = True
+
+    def close_mouth(self):
+        self.mouth_open = False
 
 
 class Game:
@@ -218,8 +231,13 @@ class Game:
                 self.game_over()
         # Collision with food
         if (new_position == self.food.position).all():
-            self.place_food()
+            self.snake.open_mouth()
             self.snake.grow()
+            self.place_food()
+        # Food in front
+        new_position = new_position + self.snake.direction
+        if (new_position == self.food.position).all():
+            self.snake.open_mouth()
 
     def place_food(self):
         self.food.move()
@@ -238,6 +256,7 @@ class Game:
     def update(self):
         if self.pause:
             return
+        self.snake.close_mouth()
         self.change_direction()
         self.check_collisions()
         self.snake.move()
