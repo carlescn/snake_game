@@ -1,4 +1,4 @@
-""" Snake game """
+""" An implementation of the Snake game using pygame and numpy arrays """
 import sys
 import random
 import pygame
@@ -13,18 +13,18 @@ LEFT  = np.array((-1,  0))
 RIGHT = np.array(( 1,  0))
 
 # Customize the game look and feel:
-CELL   =  8                 # Size of one "fake pixel", in actual pixels
-BORDER =  1                 # Size of empty space between cells, in actual pixels
-SPRITE =  4 #(LEAVE AT 4!!) # Size of the sprites, in cells
-GRID_W = 20                 # Width of the screen, in sprites
-GRID_H = 20                 # Height of the screen, in sprites
+CELL_SIZE    =  8                 # Size of one "fake pixel", in actual pixels
+BORDER_WIDTH =  1                 # Size of empty space between cells, in actual pixels
+SPRITE_SIZE  =  4 #(LEAVE AT 4!!) # Size of the sprites, in cells
+GRID_WIDTH   = 20                 # Width of the screen, in sprites
+GRID_HEIGHT  = 20                 # Height of the screen, in sprites
 
-GAME_SPEED = 120            # Time between updates in milliseconds
+GAME_SPEED = 120                  # Time between updates in milliseconds
 
-START_X         = GRID_W//3 # Starting X position
-START_Y         = GRID_H//2 # Starting Y position
-START_LENGTH    = 3         # Starting size
-START_DIRECTION = RIGHT     # Starting direction
+START_X         = GRID_WIDTH//3   # Starting X position
+START_Y         = GRID_HEIGHT//2  # Starting Y position
+START_LENGTH    = 3               # Starting size
+START_DIRECTION = RIGHT           # Starting direction
 
 FOOD_SPRITE = ((0, 1, 0, 0),
                (1, 0, 1, 0),
@@ -51,68 +51,61 @@ SNAKE_TURN  = ((0, 0, 0, 0),
                (0, 1, 0, 1),
                (0, 1, 1, 0))
 
-class Cell:
-    def __init__(self, x = 0, y = 0):
-    # pylint:disable=invalid-name  # doesn't like single letter x, y
-        self.color = CELL_COLOR
-        rect_size = CELL - BORDER
-        self.rect = pygame.Rect(0, 0, rect_size, rect_size)
-        self.place(x, y)
+def check_sprites_size():
+    for sprite in (FOOD_SPRITE, SNAKE_HEAD, SNAKE_BODY, SNAKE_TAIL):
+        assert np.array(sprite).shape[0] == SPRITE_SIZE
+        assert np.array(sprite).shape[1] == SPRITE_SIZE
 
-    def place(self, x, y):
+
+class Cell:
+    def __init__(self, x, y):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        self.rect.x = x * CELL + BORDER
-        self.rect.y = y * CELL + BORDER
+        rect_size = CELL_SIZE - BORDER_WIDTH
+        x = x * CELL_SIZE + BORDER_WIDTH
+        y = y * CELL_SIZE + BORDER_WIDTH
+        self.rect = pygame.Rect(x, y, rect_size, rect_size)
 
     def draw(self):
-        pygame.draw.rect(screen, self.color, self.rect)
+        pygame.draw.rect(screen, CELL_COLOR, self.rect)
 
 
 class Sprite:
     """
-    sprite:
     position: np.array(x:int, y:int)
     """
-    def __init__(self, sprite, position, direction = RIGHT, flip = False):
+    def __init__(self, sprite, position, direction = RIGHT):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        self._check_sprite_size(sprite)
-        self.sprite = self._rotate_sprite(sprite, direction, flip)
         self.position = position
-        self.cell_positions = self._get_cell_positions()
-        self.cells = [Cell(x, y) for x, y in self.cell_positions]
+        self.original_sprite = sprite
+        self.sprite = None
+        self.face(direction)
 
-    def _check_sprite_size(self, sprite):
-        assert len(sprite) == SPRITE  # Check number of cols
-        for col in sprite:
-            assert len(col) == SPRITE # Check number of rows
+    def face(self, direction):
+        if (direction == RIGHT).all():
+            self.sprite = np.array(self.original_sprite)
+        elif (direction == UP).all():
+            self.sprite = np.rot90(self.original_sprite)
+        elif (direction == LEFT).all():
+            self.sprite = np.rot90(self.original_sprite,2)
+        elif (direction == DOWN).all():
+            self.sprite = np.rot90(self.original_sprite,3)
 
-    def _get_cell_positions(self):
-        cell_positions = []
-        for j, col in enumerate(self.sprite):
-            for i, pos in enumerate(col):
-                if pos:
-                    cell_positions.append(np.array((i, j)))
-        return cell_positions
+    def flip_h(self):
+        self.sprite = np.fliplr(self.sprite)
+
+    def flip_v(self):
+        self.sprite = np.flipud(self.sprite)
 
     def draw(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        x, y = self.position
-        for cell, (i, j) in zip(self.cells, self.cell_positions):
-            cell.place(x * SPRITE + i, y * SPRITE + j)
+        cell_positions = [
+            np.array((i, j)) for j, col in enumerate(self.sprite)
+            for i, pos in enumerate(col)
+            if pos
+        ]
+        x, y = self.position * SPRITE_SIZE
+        for cell in [Cell(x + i, y + j) for i, j in cell_positions]:
             cell.draw()
-
-    def _rotate_sprite(self, sprite, direction, flip):
-        if (direction == UP).all():
-            sprite = np.rot90(sprite)
-        elif (direction == DOWN).all():
-            sprite = np.rot90(sprite,3)
-        elif (direction == LEFT).all():
-            sprite = np.fliplr(sprite)
-        elif (direction == RIGHT).all():
-            sprite = np.array(sprite)
-        if flip:
-            sprite = np.fliplr(sprite)
-        return sprite
 
 
 class Food:
@@ -122,8 +115,8 @@ class Food:
 
     def move(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        x = random.randint(0, GRID_W -1)
-        y = random.randint(0, GRID_H -1)
+        x = random.randint(0, GRID_WIDTH -1)
+        y = random.randint(0, GRID_HEIGHT -1)
         self.position = np.array((x, y))
 
     def draw(self):
@@ -176,37 +169,22 @@ class Snake:
         self.moving = False
 
     def get_sprites(self):
-        head = [Sprite(SNAKE_HEAD, self.positions[0], self._directions[0]),]
-        tail = [Sprite(SNAKE_TAIL, self.positions[-1], self._directions[-1]),]
+        head = Sprite(SNAKE_HEAD, self.positions[0], self._directions[0])
+        if (self._directions[0] == LEFT).all():
+            head.flip_v()
+        tail = Sprite(SNAKE_TAIL, self.positions[-1], self._directions[-1])
         body = []
         for i, position in enumerate(self.positions[1:-1]):
-            new_dir  = self._directions[i+1]
-            old_dir = self._directions[i+2]
-            if (new_dir == old_dir).all():
-                body += [Sprite(SNAKE_BODY, position, new_dir),]
+            sprite_dir   = self._directions[i+1]
+            previous_dir = self._directions[i+2]
+            if (sprite_dir == previous_dir).all():
+                body += [Sprite(SNAKE_BODY, position, sprite_dir),]
             else:
-                # TODO: Make this simpler?
-                flip = False
-                if (old_dir == UP).all() and (new_dir == RIGHT).all():
-                    direction = RIGHT
-                elif (old_dir == LEFT).all() and (new_dir == DOWN).all():
-                    direction = RIGHT
-                elif (old_dir == UP).all() and (new_dir == LEFT).all():
-                    direction = LEFT
-                elif (old_dir == RIGHT).all() and (new_dir == DOWN).all():
-                    direction = LEFT
-                elif (old_dir == DOWN).all() and (new_dir == RIGHT).all():
-                    direction = UP
-                elif (old_dir == LEFT).all() and (new_dir == UP).all():
-                    direction = UP
-                elif (old_dir == DOWN).all() and (new_dir == LEFT).all():
-                    direction = UP
-                    flip = True
-                elif (old_dir == RIGHT).all() and (new_dir == UP).all():
-                    direction = UP
-                    flip = True
-                body += [Sprite(SNAKE_TURN, position, direction, flip),]
-        return head + body + tail
+                rotate_left=np.array(((0, -1), (1, 0)))
+                if (previous_dir.dot(rotate_left) == sprite_dir).all():
+                    sprite_dir = sprite_dir.dot(rotate_left)
+                body += [Sprite(SNAKE_TURN, position, sprite_dir),]
+        return [head,] + body + [tail,]
 
     def draw(self):
         for sprite in self.get_sprites():
@@ -231,7 +209,7 @@ class Game:
     def check_collisions(self):
         new_position = self.snake.positions[0] + self.snake.direction
         # Collision with wall
-        if not 0 <= new_position[0] < GRID_W or not 0 <= new_position[1] < GRID_H:
+        if not 0 <= new_position[0] < GRID_WIDTH or not 0 <= new_position[1] < GRID_HEIGHT:
             self.game_over()
         # Collision with body
         for position in self.snake.positions[1:]:
@@ -271,12 +249,17 @@ class Game:
         self.snake.draw()
 
 
+# pylint:disable=invalid-name  # doesn't like lower case variables
+check_sprites_size()
+
 pygame.init()
-screen = pygame.display.set_mode((GRID_W * CELL * SPRITE, GRID_H * CELL * SPRITE))
+screen_width = GRID_WIDTH * CELL_SIZE * SPRITE_SIZE
+screen_height = GRID_HEIGHT * CELL_SIZE * SPRITE_SIZE
+screen = pygame.display.set_mode((screen_width, screen_height))
+
 clock  = pygame.time.Clock()
 game   = Game()
-
-timer  = pygame.USEREVENT  # pylint:disable=invalid-name  # lower case
+timer  = pygame.USEREVENT
 pygame.time.set_timer(timer, GAME_SPEED)
 
 while True:
