@@ -26,38 +26,44 @@ START_Y         = GRID_HEIGHT//2  # Starting Y position
 START_LENGTH    = 4               # Starting size
 START_DIRECTION = RIGHT           # Starting direction
 
-FOOD_SPRITE = ((0, 1, 0, 0),
-               (1, 0, 1, 0),
-               (0, 1, 0, 0),
-               (0, 0, 0, 0))
+FOOD_SPRITE  = ((0, 1, 0, 0),
+                (1, 0, 1, 0),
+                (0, 1, 0, 0),
+                (0, 0, 0, 0))
 
-SNAKE_HEAD  = ((1, 0, 0, 0),
-               (0, 1, 1, 0),
-               (1, 1, 1, 0),
-               (0, 0, 0, 0))
+SPRITE_HEAD  = ((1, 0, 0, 0),
+                (0, 1, 1, 0),
+                (1, 1, 1, 0),
+                (0, 0, 0, 0))
 
-SNAKE_MOUTH = ((1, 0, 1, 0),
-               (0, 1, 0, 0),
-               (1, 1, 0, 0),
-               (0, 0, 1, 0))
+SPRITE_MOUTH = ((1, 0, 1, 0),
+                (0, 1, 0, 0),
+                (1, 1, 0, 0),
+                (0, 0, 1, 0))
 
-SNAKE_BODY  = ((0, 0, 0, 0),
-               (1, 1, 0, 1),
-               (1, 0, 1, 1),
-               (0, 0, 0, 0))
+SPRITE_BODY  = ((0, 0, 0, 0),
+                (1, 1, 0, 1),
+                (1, 0, 1, 1),
+                (0, 0, 0, 0))
 
-SNAKE_TAIL  = ((0, 0, 0, 0),
-               (0, 0, 0, 1),
-               (0, 1, 1, 1),
-               (0, 0, 0, 0))
+SPRITE_FULL  = ((0, 1, 1, 0),
+                (1, 1, 0, 1),
+                (1, 0, 1, 1),
+                (0, 1, 1, 0))
 
-SNAKE_TURN  = ((0, 0, 0, 0),
-               (0, 0, 1, 1),
-               (0, 1, 0, 1),
-               (0, 1, 1, 0))
+SPRITE_TURN  = ((0, 0, 0, 0),
+                (0, 0, 1, 1),
+                (0, 1, 0, 1),
+                (0, 1, 1, 0))
+
+SPRITE_TAIL  = ((0, 0, 0, 0),
+                (0, 0, 0, 1),
+                (0, 1, 1, 1),
+                (0, 0, 0, 0))
 
 def _check_sprites_size():
-    for sprite in (FOOD_SPRITE, SNAKE_HEAD, SNAKE_BODY, SNAKE_TAIL):
+    for sprite in (FOOD_SPRITE, SPRITE_HEAD, SPRITE_MOUTH,
+                   SPRITE_BODY, SPRITE_FULL, SPRITE_TURN, SPRITE_TAIL):
         assert np.array(sprite).shape[0] == SPRITE_SIZE
         assert np.array(sprite).shape[1] == SPRITE_SIZE
 
@@ -130,8 +136,9 @@ class Food:
 
 class Snake:
     def __init__(self):
-        self._directions = None
         self.positions = None
+        self.body_directions = None
+        self.body_full = None
         self.direction = None
         self.growing = None
         self.mouth_open = None
@@ -140,45 +147,54 @@ class Snake:
     def restart(self):
         start_xys = np.array((START_X, START_Y))
         self.positions = [start_xys - START_DIRECTION * i for i in np.arange(START_LENGTH)]
+        self.body_directions = [START_DIRECTION,] * START_LENGTH
+        self.body_full = [False,] * START_LENGTH
         self.direction = START_DIRECTION
-        self._directions = [START_DIRECTION,] * START_LENGTH
         self.growing = False
         self.mouth_open = False
 
     def move(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        if not self.growing:
-            self._directions.pop(-1)
+        if not self.body_full[-1]:
+            self.body_directions.pop(-1)
             self.positions.pop(-1)
-        self._directions[0] = self.direction
-        self._directions.insert(0, self.direction)
+            self.body_full.pop(-1)
+        else:
+            self.body_full[-1] = False
+        self.body_directions[0] = self.direction
+        self.body_directions.insert(0, self.direction)
         self.positions.insert(0, self.positions[0] + self.direction)
-        self.growing = False
+        self.body_full.insert(0, False)
+        if self.growing:
+            self.body_full[0] = True
+            self.growing = False
 
     def _get_head_sprite(self):
-        sprite = SNAKE_MOUTH if self.mouth_open else SNAKE_HEAD
-        head = Sprite(sprite, self.positions[0], self._directions[0])
-        if (self._directions[0] == LEFT).all():
+        sprite = SPRITE_MOUTH if self.mouth_open else SPRITE_HEAD
+        head = Sprite(sprite, self.positions[0], self.body_directions[0])
+        if (self.body_directions[0] == LEFT).all():
             head.flip_v()
-        if (self._directions[0] == DOWN).all():
+        if (self.body_directions[0] == DOWN).all():
             head.flip_h()
         return [head,]
 
     def _get_tail_sprite(self):
-        tail = Sprite(SNAKE_TAIL, self.positions[-1], self._directions[-1])
-        if (self._directions[-1] == LEFT).all():
+        sprite = SPRITE_FULL if self.body_full[-1] else SPRITE_TAIL
+        tail = Sprite(sprite, self.positions[-1], self.body_directions[-1])
+        if (self.body_directions[-1] == LEFT).all():
             tail.flip_v()
-        if (self._directions[-1] == DOWN).all():
+        if (self.body_directions[-1] == DOWN).all():
             tail.flip_h()
         return [tail,]
 
     def _get_body_sprites(self):
         body = []
         for i, position in enumerate(self.positions[1:-1]):
-            sprite_dir   = self._directions[i+1]
-            previous_dir = self._directions[i+2]
-            if (sprite_dir == previous_dir).all():
-                body_sprite = Sprite(SNAKE_BODY, position, sprite_dir)
+            sprite_dir   = self.body_directions[i+1]
+            previous_dir = self.body_directions[i+2]
+            if (sprite_dir == previous_dir).all() or self.body_full[i+1]:
+                sprite = SPRITE_FULL if self.body_full[i+1] else SPRITE_BODY
+                body_sprite = Sprite(sprite, position, sprite_dir)
                 if (sprite_dir == LEFT).all():
                     body_sprite.flip_v()
                 if (sprite_dir == DOWN).all():
@@ -188,9 +204,9 @@ class Snake:
                 rotate_left=np.array(((0, -1), (1, 0)))
                 if (previous_dir.dot(rotate_left) == sprite_dir).all():
                     sprite_dir = sprite_dir.dot(rotate_left)
-                body += [Sprite(SNAKE_TURN, position, sprite_dir),]
+                body += [Sprite(SPRITE_TURN, position, sprite_dir),]
         return body
-    
+
     def _get_sprites(self):
         head = self._get_head_sprite()
         body = self._get_body_sprites()
@@ -214,6 +230,7 @@ class Snake:
 class Game:
     def __init__(self):
         self.pause = True
+        self.score = 0
         self.high_score = 0
         self.food  = Food()
         self.snake = Snake()
@@ -257,6 +274,7 @@ class Game:
             self.snake.open_mouth()
             self.snake.grow()
             self.place_food()
+            self.score += 1
         # Food in front
         new_position = new_position + self.snake.direction
         if (new_position == self.food.position).all():
@@ -269,11 +287,10 @@ class Game:
                 self.place_food()
 
     def show_score(self):
-        score = len(self.snake.positions) - START_LENGTH
-        if score > self.high_score:
-            self.high_score = score
+        if self.score > self.high_score:
+            self.high_score = self.score
         pygame.display.set_caption(
-            f'Snake - Score = {score:d} (High score: {self.high_score:d})'
+            f'Snake - Score = {self.score:d} (High score: {self.high_score:d})'
         )
 
     def update(self):
@@ -287,6 +304,7 @@ class Game:
 
     def game_over(self):
         self.pause = True
+        self.score = 0
         self.snake.restart()
         self.place_food()
 
