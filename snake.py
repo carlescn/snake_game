@@ -81,9 +81,7 @@ class Cell:
 
 
 class Sprite:
-    """
-    position: np.array(x:int, y:int)
-    """
+    """ position: np.array(x:int, y:int) """
     def __init__(self, sprite, position, direction = RIGHT):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
         self.position = position
@@ -136,17 +134,8 @@ class Food:
 
 class Snake:
     def __init__(self):
-        self.positions = None
-        self.body_directions = None
-        self.body_full = None
-        self.direction = None
-        self.growing = None
-        self.mouth_open = None
-        self.restart()
-
-    def restart(self):
         start_xys = np.array((START_X, START_Y))
-        self.positions = [start_xys - START_DIRECTION * i for i in np.arange(START_LENGTH)]
+        self.body_positions = [start_xys - START_DIRECTION * i for i in np.arange(START_LENGTH)]
         self.body_directions = [START_DIRECTION,] * START_LENGTH
         self.body_full = [False,] * START_LENGTH
         self.direction = START_DIRECTION
@@ -155,15 +144,15 @@ class Snake:
 
     def move(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        if not self.body_full[-1]:
-            self.body_directions.pop(-1)
-            self.positions.pop(-1)
-            self.body_full.pop(-1)
-        else:
+        if self.body_full[-1]:
             self.body_full[-1] = False
+        else:
+            self.body_directions.pop(-1)
+            self.body_positions.pop(-1)
+            self.body_full.pop(-1)
         self.body_directions[0] = self.direction
         self.body_directions.insert(0, self.direction)
-        self.positions.insert(0, self.positions[0] + self.direction)
+        self.body_positions.insert(0, self.body_positions[0] + self.direction)
         self.body_full.insert(0, False)
         if self.growing:
             self.body_full[0] = True
@@ -171,7 +160,7 @@ class Snake:
 
     def _get_head_sprite(self):
         sprite = SPRITE_MOUTH if self.mouth_open else SPRITE_HEAD
-        head = Sprite(sprite, self.positions[0], self.body_directions[0])
+        head = Sprite(sprite, self.body_positions[0], self.body_directions[0])
         if (self.body_directions[0] == LEFT).all():
             head.flip_v()
         if (self.body_directions[0] == DOWN).all():
@@ -180,7 +169,7 @@ class Snake:
 
     def _get_tail_sprite(self):
         sprite = SPRITE_FULL if self.body_full[-1] else SPRITE_TAIL
-        tail = Sprite(sprite, self.positions[-1], self.body_directions[-1])
+        tail = Sprite(sprite, self.body_positions[-1], self.body_directions[-1])
         if (self.body_directions[-1] == LEFT).all():
             tail.flip_v()
         if (self.body_directions[-1] == DOWN).all():
@@ -189,7 +178,7 @@ class Snake:
 
     def _get_body_sprites(self):
         body = []
-        for i, position in enumerate(self.positions[1:-1]):
+        for i, position in enumerate(self.body_positions[1:-1]):
             sprite_dir   = self.body_directions[i+1]
             previous_dir = self.body_directions[i+2]
             if (sprite_dir == previous_dir).all() or self.body_full[i+1]:
@@ -232,10 +221,10 @@ class Game:
         self.pause = True
         self.score = 0
         self.high_score = 0
+        self.direction_buffer = []
         self.food  = Food()
         self.snake = Snake()
         self.place_food()
-        self.direction_buffer = []
 
     def change_direction(self):
         if len(self.direction_buffer) == 0:
@@ -245,7 +234,7 @@ class Game:
         direction = self.direction_buffer.pop(0)
         # This does'n work because you could change directions two times before it moves:
         # if (self.snake.direction + direction == 0).all():
-        if (self.snake.positions[0] + direction == self.snake.positions[1]).all():
+        if (self.snake.body_positions[0] + direction == self.snake.body_positions[1]).all():
             return
         self.snake.direction = direction
         self.pause = False
@@ -261,12 +250,12 @@ class Game:
             self.pause = False
 
     def check_collisions(self):
-        new_position = self.snake.positions[0] + self.snake.direction
+        new_position = self.snake.body_positions[0] + self.snake.direction
         # Collision with wall
         if not 0 <= new_position[0] < GRID_WIDTH or not 0 <= new_position[1] < GRID_HEIGHT:
             self.game_over()
         # Collision with body
-        for position in self.snake.positions[1:]:
+        for position in self.snake.body_positions[1:]:
             if (new_position == position).all():
                 self.game_over()
         # Collision with food
@@ -282,13 +271,12 @@ class Game:
 
     def place_food(self):
         self.food.move()
-        for position in self.snake.positions:
+        for position in self.snake.body_positions:
             if (self.food.position == position).all():
                 self.place_food()
 
     def show_score(self):
-        if self.score > self.high_score:
-            self.high_score = self.score
+        self.high_score = max(self.score, self.high_score)
         pygame.display.set_caption(
             f'Snake - Score = {self.score:d} (High score: {self.high_score:d})'
         )
@@ -305,7 +293,7 @@ class Game:
     def game_over(self):
         self.pause = True
         self.score = 0
-        self.snake.restart()
+        self.snake = Snake()
         self.place_food()
 
     def draw(self):
