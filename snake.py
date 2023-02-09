@@ -1,8 +1,12 @@
-""" An implementation of the Snake game using pygame and numpy arrays """
+""" An implementation of the Snake game using Pygame and NumPy arrays """
+
 import sys
 import random
+
 import pygame
 import numpy as np
+
+import sprites
 
 BG_COLOR   = pygame.Color((175, 215, 5))
 CELL_COLOR = pygame.Color(( 35,  43, 1))
@@ -13,57 +17,22 @@ LEFT  = np.array((-1,  0))
 RIGHT = np.array(( 1,  0))
 
 # Customize the game look and feel:
-CELL_SIZE    =  8                 # Size of one "fake pixel", in actual pixels
-BORDER_WIDTH =  1                 # Size of empty space between cells, in actual pixels
-SPRITE_SIZE  =  4 #(LEAVE AT 4!!) # Size of the sprites, in cells
-GRID_WIDTH   = 16                 # Width of the screen, in sprites
-GRID_HEIGHT  =  9                 # Height of the screen, in sprites
+CELL_SIZE    =   6  # Size of one "fake pixel", in actual pixels
+BORDER_WIDTH =   1  # Size of empty space between cells, in actual pixels
+SPRITE_SIZE  =   4  # Size of the sprites, in cells (MUST MATCH SIZE OF SPRITES IN sprites.py !!)
+GRID_WIDTH   =  16  # Width of the screen, in sprites
+GRID_HEIGHT  =   9  # Height of the screen, in sprites
 
-GAME_SPEED   = 150                # Time between updates in milliseconds
+GAME_SPEED   = 200  # Milliseconds between game cycles
 
 START_X         = GRID_WIDTH//3   # Starting X position
 START_Y         = GRID_HEIGHT//2  # Starting Y position
 START_LENGTH    = 4               # Starting size
 START_DIRECTION = RIGHT           # Starting direction
 
-FOOD_SPRITE  = ((0, 1, 0, 0),
-                (1, 0, 1, 0),
-                (0, 1, 0, 0),
-                (0, 0, 0, 0))
 
-SPRITE_HEAD  = ((1, 0, 0, 0),
-                (0, 1, 1, 0),
-                (1, 1, 1, 0),
-                (0, 0, 0, 0))
-
-SPRITE_MOUTH = ((1, 0, 1, 0),
-                (0, 1, 0, 0),
-                (1, 1, 0, 0),
-                (0, 0, 1, 0))
-
-SPRITE_BODY  = ((0, 0, 0, 0),
-                (1, 1, 0, 1),
-                (1, 0, 1, 1),
-                (0, 0, 0, 0))
-
-SPRITE_FULL  = ((0, 1, 1, 0),
-                (1, 1, 0, 1),
-                (1, 0, 1, 1),
-                (0, 1, 1, 0))
-
-SPRITE_TURN  = ((0, 0, 0, 0),
-                (0, 0, 1, 1),
-                (0, 1, 0, 1),
-                (0, 1, 1, 0))
-
-SPRITE_TAIL  = ((0, 0, 0, 0),
-                (0, 0, 0, 1),
-                (0, 1, 1, 1),
-                (0, 0, 0, 0))
-
-def _check_sprites_size():
-    for sprite in (FOOD_SPRITE, SPRITE_HEAD, SPRITE_MOUTH,
-                   SPRITE_BODY, SPRITE_FULL, SPRITE_TURN, SPRITE_TAIL):
+def check_sprites_size(sprites_list):
+    for sprite in sprites_list:
         assert np.array(sprite).shape[0] == SPRITE_SIZE
         assert np.array(sprite).shape[1] == SPRITE_SIZE
 
@@ -129,7 +98,7 @@ class Food:
         self.position = np.array((x, y))
 
     def draw(self):
-        Sprite(FOOD_SPRITE, self.position).draw()
+        Sprite(sprites.food, self.position).draw()
 
 
 class Snake:
@@ -177,7 +146,7 @@ class Snake:
             sprite.draw()
 
     def _get_head_sprite(self):
-        sprite = SPRITE_MOUTH if self.mouth_open else SPRITE_HEAD
+        sprite = sprites.snake_mouth if self.mouth_open else sprites.snake_head
         head_sprite = Sprite(sprite, self.sections[0]["position"], self.sections[0]["direction"])
         if (self.sections[0]["direction"] == LEFT).all():
             head_sprite.flip_v()
@@ -186,7 +155,7 @@ class Snake:
         return [head_sprite,]
 
     def _get_tail_sprite(self):
-        sprite = SPRITE_FULL if self.sections[-1]["full"] else SPRITE_TAIL
+        sprite = sprites.snake_full if self.sections[-1]["full"] else sprites.snake_tail
         tail_sprite = Sprite(sprite, self.sections[-1]["position"], self.sections[-1]["direction"])
         if (self.sections[-1]["direction"] == LEFT).all():
             tail_sprite.flip_v()
@@ -200,7 +169,7 @@ class Snake:
             section_dir  = section["direction"]
             previous_dir = self.sections[i+2]["direction"]
             if (section_dir == previous_dir).all() or section["full"]:
-                sprite = SPRITE_FULL if section["full"] else SPRITE_BODY
+                sprite = sprites.snake_full if section["full"] else sprites.snake_body
                 body_sprite = Sprite(sprite, section["position"], section_dir)
                 if (section_dir == LEFT).all():
                     body_sprite.flip_v()
@@ -211,7 +180,7 @@ class Snake:
                 rotate_left=np.array(((0, -1), (1, 0)))
                 if (previous_dir.dot(rotate_left) == section_dir).all():
                     section_dir = section_dir.dot(rotate_left)
-                body_sprites += [Sprite(SPRITE_TURN, section["position"], section_dir),]
+                body_sprites += [Sprite(sprites.snake_turn, section["position"], section_dir),]
         return body_sprites
 
     def _get_sprites(self):
@@ -303,30 +272,31 @@ class Game:
         self.snake.draw()
 
 
-# pylint:disable=invalid-name  # doesn't like lower case variables
-_check_sprites_size()
+if __name__ == "__main__":
+    # pylint:disable=invalid-name  # doesn't like lower case variables
+    check_sprites_size(sprites.sprites_list)
 
-pygame.init()
-screen_width = GRID_WIDTH * CELL_SIZE * SPRITE_SIZE
-screen_height = GRID_HEIGHT * CELL_SIZE * SPRITE_SIZE
-screen = pygame.display.set_mode((screen_width, screen_height))
+    pygame.init()
+    screen_width = GRID_WIDTH * CELL_SIZE * SPRITE_SIZE
+    screen_height = GRID_HEIGHT * CELL_SIZE * SPRITE_SIZE
+    screen = pygame.display.set_mode((screen_width, screen_height))
 
-clock  = pygame.time.Clock()
-game   = Game()
-timer  = pygame.USEREVENT
-pygame.time.set_timer(timer, GAME_SPEED)
+    clock  = pygame.time.Clock()
+    game   = Game()
+    timer  = pygame.USEREVENT
+    pygame.time.set_timer(timer, GAME_SPEED)
 
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        if event.type == pygame.KEYDOWN:
-            game.handle_input_key(event.key)
-        if event.type == timer:
-            game.update()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                game.handle_input_key(event.key)
+            if event.type == timer:
+                game.update()
 
-    screen.fill(BG_COLOR)
-    game.draw()
-    pygame.display.update()
-    clock.tick(60)
+        screen.fill(BG_COLOR)
+        game.draw()
+        pygame.display.update()
+        clock.tick(60)
