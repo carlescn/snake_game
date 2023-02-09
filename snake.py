@@ -15,14 +15,14 @@ RIGHT = np.array(( 1,  0))
 
 # BEGIN Customize some game parameters:
 ## Graphics
-CELL_WIDTH   =  6    # Width  of one "fake pixel", in actual pixels
-CELL_HEIGHT  =  8    # Height of one "fake pixel", in actual pixels
-BORDER_WIDTH =  1    # Size of the empty space between cells, in actual pixels
-GRID_WIDTH   = 20    # Width  of the screen, in sprites (see below)
-GRID_HEIGHT  =  9    # Height of the screen, in sprites (see below)
-HUD_BORDER   =  5    # Size of borders at the edge of the screen, in cells
-BG_COLOR     = pygame.Color((175, 215, 5))    # Color of the background
-CELL_COLOR   = pygame.Color(( 35,  43, 1))    # Color of the "fake pixels"
+CELL_WIDTH    =  6    # Width  of one "fake pixel", in actual pixels
+CELL_HEIGHT   =  8    # Height of one "fake pixel", in actual pixels
+BORDER_WIDTH  =  1    # Size of the empty space between cells, in actual pixels
+GRID_WIDTH    = 20    # Width  of the screen, in sprites (see below)
+GRID_HEIGHT   =  9    # Height of the screen, in sprites (see below)
+SCREEN_BORDER =  20    # Size of borders at the edge of the screen, in cells
+BG_COLOR      = pygame.Color((175, 215, 5))    # Color of the background
+CELL_COLOR    = pygame.Color(( 35,  43, 1))    # Color of the "fake pixels"
 
 ## Starting position
 START_X         = GRID_WIDTH//2     # Starting X position
@@ -46,10 +46,10 @@ LEVEL_WIDTH  = GRID_WIDTH  * SPRITE_SIZE
 LEVEL_HEIGHT = GRID_HEIGHT * SPRITE_SIZE
 
 
-def check_sprites_size(sprites_list):
+def check_sprites_size(sprites_list, height, width):
     for sprite in sprites_list:
-        assert np.array(sprite).shape[0] == SPRITE_SIZE
-        assert np.array(sprite).shape[1] == SPRITE_SIZE
+        assert np.array(sprite).shape[0] == height
+        assert np.array(sprite).shape[1] == width
 
 
 class Cell:
@@ -88,14 +88,15 @@ class Sprite:
     def flip_v(self):
         self.sprite = np.flipud(self.sprite)
 
-    def draw(self):
+    def draw(self, hud = False):
         cell_positions = [
             np.array((i, j)) for j, col in enumerate(self.sprite) for i, xy in enumerate(col) if xy
         ]
-        sprite_x, sprite_y = self.position * SPRITE_SIZE
+        sprite_x = self.position[0] * (HUD_SPRITE_W if hud else SPRITE_SIZE)
+        sprite_y = self.position[1] * (HUD_SPRITE_H if hud else SPRITE_SIZE)
         for cell_x, cell_y in cell_positions:
-            cell_x += sprite_x + HUD_BORDER
-            cell_y += sprite_y + HUD_BORDER + HUD_BAR
+            cell_x += sprite_x + SCREEN_BORDER + (-2 if hud else 0)
+            cell_y += sprite_y + SCREEN_BORDER + (-2 if hud else HUD_BAR)
             Cell(cell_x, cell_y).draw()
 
 
@@ -205,13 +206,28 @@ class Snake:
 class Game:
     def __init__(self):
         self.pause = True
-        self.hud = Hud()
-        self.score = 0
-        self.high_score = 0
         self.direction_buffer = []
-        self.food  = Food()
+        self.score = 0
+        self.hud = Hud()
+        self.food = Food()
         self.snake = Snake()
         self.place_food()
+
+    def handle_input_key(self, key):
+        match key:
+            case pygame.K_UP   : self.direction_buffer += [UP,]
+            case pygame.K_DOWN : self.direction_buffer += [DOWN,]
+            case pygame.K_LEFT : self.direction_buffer += [LEFT,]
+            case pygame.K_RIGHT: self.direction_buffer += [RIGHT,]
+            case pygame.K_SPACE: self.pause = not self.pause
+        if len(self.direction_buffer) > 0:
+            self.pause = False
+
+    def place_food(self):
+        self.food.move()
+        for section in self.snake.sections:
+            if (self.food.position == section["position"]).all():
+                self.place_food()
 
     def change_direction(self):
         if len(self.direction_buffer) == 0:
@@ -224,16 +240,6 @@ class Game:
         if (self.snake.sections[0]["position"] + direction == self.snake.sections[1]["position"]).all():
             return
         self.snake.direction = direction
-
-    def handle_input_key(self, key):
-        match key:
-            case pygame.K_UP   : self.direction_buffer += [UP,]
-            case pygame.K_DOWN : self.direction_buffer += [DOWN,]
-            case pygame.K_LEFT : self.direction_buffer += [LEFT,]
-            case pygame.K_RIGHT: self.direction_buffer += [RIGHT,]
-            case pygame.K_SPACE: self.pause = not self.pause
-        if len(self.direction_buffer) > 0:
-            self.pause = False
 
     def check_collisions(self):
         new_position = self.snake.sections[0]["position"] + self.snake.direction
@@ -255,16 +261,6 @@ class Game:
         if (new_position == self.food.position).all():
             self.snake.open_mouth()
 
-    def place_food(self):
-        self.food.move()
-        for section in self.snake.sections:
-            if (self.food.position == section["position"]).all():
-                self.place_food()
-
-    def show_score(self):
-        self.high_score = max(self.score, self.high_score)
-        pygame.display.set_caption(f'Snake - Score = {self.score:d} (High score: {self.high_score:d})')
-
     def update(self):
         if self.pause:
             return
@@ -272,14 +268,6 @@ class Game:
         self.change_direction()
         self.check_collisions()
         self.snake.move()
-        # TODO: Remove this?
-        self.show_score()
-
-    def game_over(self):
-        self.pause = True
-        self.score = 0
-        self.snake = Snake()
-        self.place_food()
 
     def draw(self):
         self.hud.draw_borders()
@@ -287,34 +275,52 @@ class Game:
         self.food.draw()
         self.snake.draw()
 
+    def game_over(self):
+        self.pause = True
+        self.score = 0
+        self.snake = Snake()
+        self.place_food()
+
 
 class Hud:
     def draw_borders(self):
     # pylint:disable=invalid-name  # doesn't like lower case variables
-        for x in np.arange(HUD_BORDER - 2, LEVEL_WIDTH + HUD_BORDER + 2):
-            Cell(x, HUD_BORDER + HUD_BAR - 4).draw()
-            Cell(x, HUD_BORDER + HUD_BAR - 2).draw()
-            Cell(x, HUD_BORDER + HUD_BAR + LEVEL_HEIGHT + 1).draw()
-        for y in np.arange(HUD_BORDER + HUD_BAR - 1, HUD_BORDER + HUD_BAR + LEVEL_HEIGHT + 1):
-            Cell(HUD_BORDER - 2, y).draw()
-            Cell(LEVEL_WIDTH + HUD_BORDER + 1, y).draw()
+        for x in np.arange(SCREEN_BORDER - 2, LEVEL_WIDTH + SCREEN_BORDER + 2):
+            Cell(x, SCREEN_BORDER + HUD_BAR - 4).draw()
+            Cell(x, SCREEN_BORDER + HUD_BAR - 2).draw()
+            Cell(x, SCREEN_BORDER + HUD_BAR + LEVEL_HEIGHT + 1).draw()
+        for y in np.arange(SCREEN_BORDER + HUD_BAR - 1, SCREEN_BORDER + HUD_BAR + LEVEL_HEIGHT + 1):
+            Cell(SCREEN_BORDER - 2, y).draw()
+            Cell(LEVEL_WIDTH + SCREEN_BORDER + 1, y).draw()
 
     def draw_score(self, score):
-    #TODO: show actual score
-    # pylint:disable=invalid-name  # doesn't like lower case variables
-        for x in np.arange(1, 17):
-            if x % 4 != 0:
-                for y in np.arange(1,6):
-                    Cell(HUD_BORDER - 2 + x, HUD_BORDER - 3 + y).draw()
+        numbers_sprites = []
+        for digit in str(score).zfill(4)[-4:]:
+            match int(digit):
+                case 1: numbers_sprites += [sprites.one,]
+                case 2: numbers_sprites += [sprites.two,]
+                case 3: numbers_sprites += [sprites.three,]
+                case 4: numbers_sprites += [sprites.four,]
+                case 5: numbers_sprites += [sprites.five,]
+                case 6: numbers_sprites += [sprites.six,]
+                case 7: numbers_sprites += [sprites.seven,]
+                case 8: numbers_sprites += [sprites.eight,]
+                case 9: numbers_sprites += [sprites.nine,]
+                case 0: numbers_sprites += [sprites.zero,]
+
+        for i, sprite in enumerate(numbers_sprites):
+            position = np.array((i, 0))
+            Sprite(sprite, position).draw(hud = True)
 
 
 if __name__ == "__main__":
     # pylint:disable=invalid-name  # doesn't like lower case variables
-    check_sprites_size(sprites.sprites_list)
+    check_sprites_size(sprites.game_sprites, SPRITE_SIZE, SPRITE_SIZE)
+    check_sprites_size(sprites.number_sprites, HUD_SPRITE_H, HUD_SPRITE_W)
 
     pygame.init()
-    screen_width  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*HUD_BORDER)
-    screen_height = CELL_HEIGHT * (LEVEL_HEIGHT + 2*HUD_BORDER + HUD_BAR)
+    screen_width  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*SCREEN_BORDER)
+    screen_height = CELL_HEIGHT * (LEVEL_HEIGHT + 2*SCREEN_BORDER + HUD_BAR)
     screen = pygame.display.set_mode((screen_width, screen_height))
 
     clock  = pygame.time.Clock()
