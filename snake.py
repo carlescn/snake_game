@@ -153,22 +153,31 @@ class Snake:
         for sprite in self._get_sprites():
             sprite.draw()
 
+    def _get_sprites(self):
+        head = self._get_head_sprite()
+        body = self._get_body_sprites()
+        tail = self._get_tail_sprite()
+        return head + body + tail
+
+    def _flip_sprite_if_left_or_down(self, sprite, direction):
+        """ This is only to imitate the Nokia game sprite orientation """
+        if (direction == LEFT).all():
+            sprite.flip_v()
+        elif (direction == DOWN).all():
+            sprite.flip_h()
+
     def _get_head_sprite(self):
+        head = self.sections[0]
         sprite = sprites.snake_mouth if self.mouth_open else sprites.snake_head
-        head_sprite = Sprite(sprite, self.sections[0]["position"], self.sections[0]["direction"])
-        if (self.sections[0]["direction"] == LEFT).all():
-            head_sprite.flip_v()
-        if (self.sections[0]["direction"] == DOWN).all():
-            head_sprite.flip_h()
+        head_sprite = Sprite(sprite, head["position"], head["direction"])
+        self._flip_sprite_if_left_or_down(head_sprite, head["direction"])
         return [head_sprite,]
 
     def _get_tail_sprite(self):
-        sprite = sprites.snake_full if self.sections[-1]["full"] else sprites.snake_tail
-        tail_sprite = Sprite(sprite, self.sections[-1]["position"], self.sections[-1]["direction"])
-        if (self.sections[-1]["direction"] == LEFT).all():
-            tail_sprite.flip_v()
-        if (self.sections[-1]["direction"] == DOWN).all():
-            tail_sprite.flip_h()
+        tail = self.sections[-1]
+        sprite = sprites.snake_full if tail["full"] else sprites.snake_tail
+        tail_sprite = Sprite(sprite, tail["position"], tail["direction"])
+        self._flip_sprite_if_left_or_down(tail_sprite, tail["direction"])
         return [tail_sprite,]
 
     def _get_body_sprites(self):
@@ -179,10 +188,7 @@ class Snake:
             if (section_dir == previous_dir).all() or section["full"]:
                 sprite = sprites.snake_full if section["full"] else sprites.snake_body
                 body_sprite = Sprite(sprite, section["position"], section_dir)
-                if (section_dir == LEFT).all():
-                    body_sprite.flip_v()
-                if (section_dir == DOWN).all():
-                    body_sprite.flip_h()
+                self._flip_sprite_if_left_or_down(body_sprite, section_dir)
                 body_sprites += [body_sprite,]
             else:
                 rotate_left=np.array(((0, -1), (1, 0)))
@@ -190,12 +196,6 @@ class Snake:
                     section_dir = section_dir.dot(rotate_left)
                 body_sprites += [Sprite(sprites.snake_turn, section["position"], section_dir),]
         return body_sprites
-
-    def _get_sprites(self):
-        head = self._get_head_sprite()
-        body = self._get_body_sprites()
-        tail = self._get_tail_sprite()
-        return head + body + tail
 
 
 class Game:
@@ -314,6 +314,10 @@ if __name__ == "__main__":
     check_sprites_size(sprites.number_sprites, HUD_SPRITE_H, HUD_SPRITE_W)
 
     pygame.init()
+    pygame.display.set_caption("Snake")
+    icon = pygame.image.load("icon.png")
+    pygame.display.set_icon(icon)
+
     screen_width  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*SCREEN_BORDER)
     screen_height = CELL_HEIGHT * (LEVEL_HEIGHT + 2*SCREEN_BORDER + HUD_BAR)
     screen = pygame.display.set_mode((screen_width, screen_height))
