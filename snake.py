@@ -20,7 +20,7 @@ CELL_HEIGHT   =  8    # Height of one "fake pixel", in actual pixels
 BORDER_WIDTH  =  1    # Size of the empty space between cells, in actual pixels
 GRID_WIDTH    = 20    # Width  of the screen, in sprites (see below)
 GRID_HEIGHT   =  9    # Height of the screen, in sprites (see below)
-SCREEN_BORDER =  20    # Size of borders at the edge of the screen, in cells
+SCREEN_BORDER =  6    # Size of borders at the edge of the screen, in cells
 BG_COLOR      = pygame.Color((175, 215, 5))    # Color of the background
 CELL_COLOR    = pygame.Color(( 35,  43, 1))    # Color of the "fake pixels"
 
@@ -117,8 +117,8 @@ class Food:
 
 class Snake:
     def __init__(self):
-        start_xys = np.array((START_X, START_Y))
-        positions = [start_xys - START_DIRECTION * i for i in np.arange(START_LENGTH)]
+        start_position = np.array((START_X, START_Y))
+        positions = [start_position - START_DIRECTION * i for i in np.arange(START_LENGTH)]
         directions = [START_DIRECTION,] * START_LENGTH
         full = [False,] * START_LENGTH
         self.sections = [
@@ -126,7 +126,6 @@ class Snake:
             for p, d, f in zip(positions, directions, full)
             ]
         self.direction = START_DIRECTION
-        self.growing = False
         self.mouth_open = False
 
     def move(self):
@@ -141,12 +140,8 @@ class Snake:
                        "full": False}
         self.sections.insert(0, new_section)
 
-        if self.growing:
-            self.sections[0]["full"] = True
-            self.growing = False
-
-    def grow(self):
-        self.growing = True
+    def eat(self):
+        self.sections[0]["full"] = True
 
     def open_mouth(self):
         self.mouth_open = True
@@ -242,23 +237,23 @@ class Game:
         self.snake.direction = direction
 
     def check_collisions(self):
-        new_position = self.snake.sections[0]["position"] + self.snake.direction
+        head_position = self.snake.sections[0]["position"]
         # Collision with wall:
-        if not 0 <= new_position[0] < GRID_WIDTH or not 0 <= new_position[1] < GRID_HEIGHT:
+        if not 0 <= head_position[0] < GRID_WIDTH or not 0 <= head_position[1] < GRID_HEIGHT:
             self.game_over()
         # Collision with body:
         for section in self.snake.sections[1:]:
-            if (new_position == section["position"]).all():
+            if (head_position == section["position"]).all():
                 self.game_over()
         # Collision with food:
-        if (new_position == self.food.position).all():
+        if (head_position == self.food.position).all():
             self.snake.open_mouth()
-            self.snake.grow()
+            self.snake.eat()
             self.place_food()
             self.score += 1
         # Food in front:
-        new_position = new_position + self.snake.direction
-        if (new_position == self.food.position).all():
+        front_position = head_position + self.snake.direction
+        if (front_position == self.food.position).all():
             self.snake.open_mouth()
 
     def update(self):
@@ -266,8 +261,8 @@ class Game:
             return
         self.snake.close_mouth()
         self.change_direction()
-        self.check_collisions()
         self.snake.move()
+        self.check_collisions()
 
     def draw(self):
         self.hud.draw_borders()
