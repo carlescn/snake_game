@@ -8,27 +8,42 @@ import numpy as np
 
 import sprites
 
-BG_COLOR   = pygame.Color((175, 215, 5))
-CELL_COLOR = pygame.Color(( 35,  43, 1))
-
 UP    = np.array(( 0, -1))
 DOWN  = np.array(( 0,  1))
 LEFT  = np.array((-1,  0))
 RIGHT = np.array(( 1,  0))
 
-# Customize the game look and feel:
-CELL_SIZE    =   6  # Size of one "fake pixel", in actual pixels
-BORDER_WIDTH =   1  # Size of empty space between cells, in actual pixels
-SPRITE_SIZE  =   4  # Size of the sprites, in cells (MUST MATCH SIZE OF SPRITES IN sprites.py !!)
-GRID_WIDTH   =  16  # Width of the screen, in sprites
-GRID_HEIGHT  =   9  # Height of the screen, in sprites
+# BEGIN Customize some game parameters:
+## Graphics
+CELL_WIDTH   =  6    # Width  of one "fake pixel", in actual pixels
+CELL_HEIGHT  =  8    # Height of one "fake pixel", in actual pixels
+BORDER_WIDTH =  1    # Size of the empty space between cells, in actual pixels
+GRID_WIDTH   = 20    # Width  of the screen, in sprites (see below)
+GRID_HEIGHT  =  9    # Height of the screen, in sprites (see below)
+HUD_BORDER   =  5    # Size of borders at the edge of the screen, in cells
+BG_COLOR     = pygame.Color((175, 215, 5))    # Color of the background
+CELL_COLOR   = pygame.Color(( 35,  43, 1))    # Color of the "fake pixels"
 
-GAME_SPEED   = 200  # Milliseconds between game cycles
+## Starting position
+START_X         = GRID_WIDTH//2     # Starting X position
+START_Y         = GRID_HEIGHT//2    # Starting Y position
+START_LENGTH    = 4                 # Starting size
+START_DIRECTION = RIGHT             # Starting direction
 
-START_X         = GRID_WIDTH//3   # Starting X position
-START_Y         = GRID_HEIGHT//2  # Starting Y position
-START_LENGTH    = 4               # Starting size
-START_DIRECTION = RIGHT           # Starting direction
+## Difficulty
+GAME_SPEED   = 200    # Milliseconds between game cycles
+# END Customize
+
+
+# BETTER DON'T TOUCH THIS!! (it *should* work with different sized sprites in sprites.py)
+SPRITE_SIZE  =  4    # Hight and width of the game sprites, in cells (see above)
+HUD_SPRITE_W =  4    # Width  of the HUD numbers sprites, in cells (see above)
+HUD_SPRITE_H =  5    # Height of the HUD numbers sprites, in cells (see above)
+HUD_BAR      =  3 + HUD_SPRITE_H    # Height of the HUD top bar, in cells (see above)
+
+
+LEVEL_WIDTH  = GRID_WIDTH  * SPRITE_SIZE
+LEVEL_HEIGHT = GRID_HEIGHT * SPRITE_SIZE
 
 
 def check_sprites_size(sprites_list):
@@ -38,12 +53,12 @@ def check_sprites_size(sprites_list):
 
 
 class Cell:
-    def __init__(self, x, y):
-    # pylint:disable=invalid-name  # doesn't like single letter x, y
-        rect_size = CELL_SIZE - BORDER_WIDTH
-        x = x * CELL_SIZE + BORDER_WIDTH
-        y = y * CELL_SIZE + BORDER_WIDTH
-        self.rect = pygame.Rect(x, y, rect_size, rect_size)
+    def __init__(self, rect_x, rect_y):
+        rect_width  = CELL_WIDTH  - BORDER_WIDTH
+        rect_height = CELL_HEIGHT - BORDER_WIDTH
+        rect_x = rect_x * CELL_WIDTH  + BORDER_WIDTH
+        rect_y = rect_y * CELL_HEIGHT + BORDER_WIDTH
+        self.rect = pygame.Rect(rect_x, rect_y, rect_width, rect_height)
 
     def draw(self):
         pygame.draw.rect(screen, CELL_COLOR, self.rect)
@@ -52,7 +67,6 @@ class Cell:
 class Sprite:
     """ position: np.array(x:int, y:int) """
     def __init__(self, sprite, position, direction = RIGHT):
-    # pylint:disable=invalid-name  # doesn't like single letter x, y
         self.position = position
         self.original_sprite = sprite
         self.sprite = None
@@ -75,15 +89,14 @@ class Sprite:
         self.sprite = np.flipud(self.sprite)
 
     def draw(self):
-    # pylint:disable=invalid-name  # doesn't like single letter x, y
         cell_positions = [
-            np.array((i, j)) for j, col in enumerate(self.sprite)
-            for i, pos in enumerate(col)
-            if pos
+            np.array((i, j)) for j, col in enumerate(self.sprite) for i, xy in enumerate(col) if xy
         ]
-        x, y = self.position * SPRITE_SIZE
-        for cell in [Cell(x + i, y + j) for i, j in cell_positions]:
-            cell.draw()
+        sprite_x, sprite_y = self.position * SPRITE_SIZE
+        for cell_x, cell_y in cell_positions:
+            cell_x += sprite_x + HUD_BORDER
+            cell_y += sprite_y + HUD_BORDER + HUD_BAR
+            Cell(cell_x, cell_y).draw()
 
 
 class Food:
@@ -93,8 +106,8 @@ class Food:
 
     def move(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        x = random.randint(0, GRID_WIDTH -1)
-        y = random.randint(0, GRID_HEIGHT -1)
+        x = random.randint(0, GRID_WIDTH - 1)
+        y = random.randint(0, GRID_HEIGHT - 1)
         self.position = np.array((x, y))
 
     def draw(self):
@@ -116,7 +129,6 @@ class Snake:
         self.mouth_open = False
 
     def move(self):
-    # pylint:disable=invalid-name  # doesn't like single letter x, y
         if self.sections[-1]["full"]:
             self.sections[-1]["full"] = False
         else:
@@ -193,6 +205,7 @@ class Snake:
 class Game:
     def __init__(self):
         self.pause = True
+        self.hud = Hud()
         self.score = 0
         self.high_score = 0
         self.direction_buffer = []
@@ -224,20 +237,20 @@ class Game:
 
     def check_collisions(self):
         new_position = self.snake.sections[0]["position"] + self.snake.direction
-        # Collision with wall
+        # Collision with wall:
         if not 0 <= new_position[0] < GRID_WIDTH or not 0 <= new_position[1] < GRID_HEIGHT:
             self.game_over()
-        # Collision with body
+        # Collision with body:
         for section in self.snake.sections[1:]:
             if (new_position == section["position"]).all():
                 self.game_over()
-        # Collision with food
+        # Collision with food:
         if (new_position == self.food.position).all():
             self.snake.open_mouth()
             self.snake.grow()
             self.place_food()
             self.score += 1
-        # Food in front
+        # Food in front:
         new_position = new_position + self.snake.direction
         if (new_position == self.food.position).all():
             self.snake.open_mouth()
@@ -259,6 +272,7 @@ class Game:
         self.change_direction()
         self.check_collisions()
         self.snake.move()
+        # TODO: Remove this?
         self.show_score()
 
     def game_over(self):
@@ -268,8 +282,30 @@ class Game:
         self.place_food()
 
     def draw(self):
+        self.hud.draw_borders()
+        self.hud.draw_score(self.score)
         self.food.draw()
         self.snake.draw()
+
+
+class Hud:
+    def draw_borders(self):
+    # pylint:disable=invalid-name  # doesn't like lower case variables
+        for x in np.arange(HUD_BORDER - 2, LEVEL_WIDTH + HUD_BORDER + 2):
+            Cell(x, HUD_BORDER + HUD_BAR - 4).draw()
+            Cell(x, HUD_BORDER + HUD_BAR - 2).draw()
+            Cell(x, HUD_BORDER + HUD_BAR + LEVEL_HEIGHT + 1).draw()
+        for y in np.arange(HUD_BORDER + HUD_BAR - 1, HUD_BORDER + HUD_BAR + LEVEL_HEIGHT + 1):
+            Cell(HUD_BORDER - 2, y).draw()
+            Cell(LEVEL_WIDTH + HUD_BORDER + 1, y).draw()
+
+    def draw_score(self, score):
+    #TODO: show actual score
+    # pylint:disable=invalid-name  # doesn't like lower case variables
+        for x in np.arange(1, 17):
+            if x % 4 != 0:
+                for y in np.arange(1,6):
+                    Cell(HUD_BORDER - 2 + x, HUD_BORDER - 3 + y).draw()
 
 
 if __name__ == "__main__":
@@ -277,8 +313,8 @@ if __name__ == "__main__":
     check_sprites_size(sprites.sprites_list)
 
     pygame.init()
-    screen_width = GRID_WIDTH * CELL_SIZE * SPRITE_SIZE
-    screen_height = GRID_HEIGHT * CELL_SIZE * SPRITE_SIZE
+    screen_width  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*HUD_BORDER)
+    screen_height = CELL_HEIGHT * (LEVEL_HEIGHT + 2*HUD_BORDER + HUD_BAR)
     screen = pygame.display.set_mode((screen_width, screen_height))
 
     clock  = pygame.time.Clock()
