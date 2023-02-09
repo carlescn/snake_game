@@ -135,76 +135,33 @@ class Food:
 class Snake:
     def __init__(self):
         start_xys = np.array((START_X, START_Y))
-        self.body_positions = [start_xys - START_DIRECTION * i for i in np.arange(START_LENGTH)]
-        self.body_directions = [START_DIRECTION,] * START_LENGTH
-        self.body_full = [False,] * START_LENGTH
+        positions = [start_xys - START_DIRECTION * i for i in np.arange(START_LENGTH)]
+        directions = [START_DIRECTION,] * START_LENGTH
+        full = [False,] * START_LENGTH
+        self.sections = [
+            {"position": p, "direction": d, "full": f}
+            for p, d, f in zip(positions, directions, full)
+            ]
         self.direction = START_DIRECTION
         self.growing = False
         self.mouth_open = False
 
     def move(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        if self.body_full[-1]:
-            self.body_full[-1] = False
+        if self.sections[-1]["full"]:
+            self.sections[-1]["full"] = False
         else:
-            self.body_directions.pop(-1)
-            self.body_positions.pop(-1)
-            self.body_full.pop(-1)
-        self.body_directions[0] = self.direction
-        self.body_directions.insert(0, self.direction)
-        self.body_positions.insert(0, self.body_positions[0] + self.direction)
-        self.body_full.insert(0, False)
+            self.sections.pop(-1)
+
+        self.sections[0]["direction"] = self.direction
+        new_section = {"position": self.sections[0]["position"] + self.direction,
+                       "direction": self.direction,
+                       "full": False}
+        self.sections.insert(0, new_section)
+
         if self.growing:
-            self.body_full[0] = True
+            self.sections[0]["full"] = True
             self.growing = False
-
-    def _get_head_sprite(self):
-        sprite = SPRITE_MOUTH if self.mouth_open else SPRITE_HEAD
-        head = Sprite(sprite, self.body_positions[0], self.body_directions[0])
-        if (self.body_directions[0] == LEFT).all():
-            head.flip_v()
-        if (self.body_directions[0] == DOWN).all():
-            head.flip_h()
-        return [head,]
-
-    def _get_tail_sprite(self):
-        sprite = SPRITE_FULL if self.body_full[-1] else SPRITE_TAIL
-        tail = Sprite(sprite, self.body_positions[-1], self.body_directions[-1])
-        if (self.body_directions[-1] == LEFT).all():
-            tail.flip_v()
-        if (self.body_directions[-1] == DOWN).all():
-            tail.flip_h()
-        return [tail,]
-
-    def _get_body_sprites(self):
-        body = []
-        for i, position in enumerate(self.body_positions[1:-1]):
-            sprite_dir   = self.body_directions[i+1]
-            previous_dir = self.body_directions[i+2]
-            if (sprite_dir == previous_dir).all() or self.body_full[i+1]:
-                sprite = SPRITE_FULL if self.body_full[i+1] else SPRITE_BODY
-                body_sprite = Sprite(sprite, position, sprite_dir)
-                if (sprite_dir == LEFT).all():
-                    body_sprite.flip_v()
-                if (sprite_dir == DOWN).all():
-                    body_sprite.flip_h()
-                body += [body_sprite,]
-            else:
-                rotate_left=np.array(((0, -1), (1, 0)))
-                if (previous_dir.dot(rotate_left) == sprite_dir).all():
-                    sprite_dir = sprite_dir.dot(rotate_left)
-                body += [Sprite(SPRITE_TURN, position, sprite_dir),]
-        return body
-
-    def _get_sprites(self):
-        head = self._get_head_sprite()
-        body = self._get_body_sprites()
-        tail = self._get_tail_sprite()
-        return head + body + tail
-
-    def draw(self):
-        for sprite in self._get_sprites():
-            sprite.draw()
 
     def grow(self):
         self.growing = True
@@ -214,6 +171,54 @@ class Snake:
 
     def close_mouth(self):
         self.mouth_open = False
+
+    def draw(self):
+        for sprite in self._get_sprites():
+            sprite.draw()
+
+    def _get_head_sprite(self):
+        sprite = SPRITE_MOUTH if self.mouth_open else SPRITE_HEAD
+        head_sprite = Sprite(sprite, self.sections[0]["position"], self.sections[0]["direction"])
+        if (self.sections[0]["direction"] == LEFT).all():
+            head_sprite.flip_v()
+        if (self.sections[0]["direction"] == DOWN).all():
+            head_sprite.flip_h()
+        return [head_sprite,]
+
+    def _get_tail_sprite(self):
+        sprite = SPRITE_FULL if self.sections[-1]["full"] else SPRITE_TAIL
+        tail_sprite = Sprite(sprite, self.sections[-1]["position"], self.sections[-1]["direction"])
+        if (self.sections[-1]["direction"] == LEFT).all():
+            tail_sprite.flip_v()
+        if (self.sections[-1]["direction"] == DOWN).all():
+            tail_sprite.flip_h()
+        return [tail_sprite,]
+
+    def _get_body_sprites(self):
+        body_sprites = []
+        for i, section in enumerate(self.sections[1:-1]):
+            section_dir  = section["direction"]
+            previous_dir = self.sections[i+2]["direction"]
+            if (section_dir == previous_dir).all() or section["full"]:
+                sprite = SPRITE_FULL if section["full"] else SPRITE_BODY
+                body_sprite = Sprite(sprite, section["position"], section_dir)
+                if (section_dir == LEFT).all():
+                    body_sprite.flip_v()
+                if (section_dir == DOWN).all():
+                    body_sprite.flip_h()
+                body_sprites += [body_sprite,]
+            else:
+                rotate_left=np.array(((0, -1), (1, 0)))
+                if (previous_dir.dot(rotate_left) == section_dir).all():
+                    section_dir = section_dir.dot(rotate_left)
+                body_sprites += [Sprite(SPRITE_TURN, section["position"], section_dir),]
+        return body_sprites
+
+    def _get_sprites(self):
+        head = self._get_head_sprite()
+        body = self._get_body_sprites()
+        tail = self._get_tail_sprite()
+        return head + body + tail
 
 
 class Game:
@@ -234,10 +239,9 @@ class Game:
         direction = self.direction_buffer.pop(0)
         # This does'n work because you could change directions two times before it moves:
         # if (self.snake.direction + direction == 0).all():
-        if (self.snake.body_positions[0] + direction == self.snake.body_positions[1]).all():
+        if (self.snake.sections[0]["position"] + direction == self.snake.sections[1]["position"]).all():
             return
         self.snake.direction = direction
-        self.pause = False
 
     def handle_input_key(self, key):
         match key:
@@ -250,13 +254,13 @@ class Game:
             self.pause = False
 
     def check_collisions(self):
-        new_position = self.snake.body_positions[0] + self.snake.direction
+        new_position = self.snake.sections[0]["position"] + self.snake.direction
         # Collision with wall
         if not 0 <= new_position[0] < GRID_WIDTH or not 0 <= new_position[1] < GRID_HEIGHT:
             self.game_over()
         # Collision with body
-        for position in self.snake.body_positions[1:]:
-            if (new_position == position).all():
+        for section in self.snake.sections[1:]:
+            if (new_position == section["position"]).all():
                 self.game_over()
         # Collision with food
         if (new_position == self.food.position).all():
@@ -271,15 +275,13 @@ class Game:
 
     def place_food(self):
         self.food.move()
-        for position in self.snake.body_positions:
-            if (self.food.position == position).all():
+        for section in self.snake.sections:
+            if (self.food.position == section["position"]).all():
                 self.place_food()
 
     def show_score(self):
         self.high_score = max(self.score, self.high_score)
-        pygame.display.set_caption(
-            f'Snake - Score = {self.score:d} (High score: {self.high_score:d})'
-        )
+        pygame.display.set_caption(f'Snake - Score = {self.score:d} (High score: {self.high_score:d})')
 
     def update(self):
         if self.pause:
