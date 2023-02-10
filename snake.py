@@ -20,7 +20,7 @@ CELL_HEIGHT   =  8    # Height of one "fake pixel", in actual pixels
 BORDER_WIDTH  =  1    # Size of the empty space between cells, in actual pixels
 GRID_WIDTH    = 20    # Width  of the screen, in sprites (see below)
 GRID_HEIGHT   =  9    # Height of the screen, in sprites (see below)
-SCREEN_BORDER =  6    # Size of borders at the edge of the screen, in cells
+SCREEN_BORDER =  3    # Size of borders at the edge of the screen, in cells
 CELL_COLOR    = pygame.Color(( 35,  43, 1))    # Color of the "fake pixels" (RGB)
 BG_MAIN_COLOR = pygame.Color((175, 215, 5))    # Main color of the background (RGB)
 BG_EDGE_COLOR = pygame.Color((155, 175, 2))    # Dark color for the background gradient (RGB)
@@ -28,7 +28,7 @@ BG_EDGE_COLOR = pygame.Color((155, 175, 2))    # Dark color for the background g
 ## Starting position
 START_X         = GRID_WIDTH//2     # Starting X position
 START_Y         = GRID_HEIGHT//2    # Starting Y position
-START_LENGTH    = 4                 # Starting size
+START_LENGTH    = 7                 # Starting size
 START_DIRECTION = RIGHT             # Starting direction
 
 ## Difficulty
@@ -228,7 +228,8 @@ class Game:
         direction = self.direction_buffer.pop(0)
         # This does'n work because you could change directions two times before it moves:
         # if (self.snake.direction + direction == 0).all():
-        if (self.snake.sections[0]["position"] + direction == self.snake.sections[1]["position"]).all():
+        if (self.snake.sections[0]["position"] + direction
+                == self.snake.sections[1]["position"]).all():
             return
         self.snake.direction = direction
 
@@ -245,6 +246,7 @@ class Game:
         if (head_position == self.food.position).all():
             self.snake.open_mouth()
             self.snake.eat()
+            BEEP.play(maxtime=10)
             self.place_food()
             self.score += 1
         # Food in front:
@@ -332,6 +334,10 @@ if __name__ == "__main__":
     screen_width  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*SCREEN_BORDER)
     screen_height = CELL_HEIGHT * (LEVEL_HEIGHT + 2*SCREEN_BORDER + HUD_BAR)
     SCREEN = pygame.display.set_mode((screen_width, screen_height))
+
+    pygame.mixer.init()
+    buffer = np.sin(2 * np.pi * np.arange(44100) * 1760 / 44100).astype(np.float32)
+    BEEP = pygame.mixer.Sound(buffer)
 
     clock  = pygame.time.Clock()
     game   = Game()
