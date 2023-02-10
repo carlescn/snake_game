@@ -36,6 +36,7 @@ GAME_SPEED  = 200    # Milliseconds between game cycles
 WRAP_AROUND = True   # Behavior when touching the edge of the screen. True: wrap around. False: die.
 # END Customize
 
+POINTS = GAME_SPEED // 100  # TODO: study the actual scoring system
 
 # BETTER DON'T TOUCH THIS!! (it *should* work with different sized sprites in sprites.py)
 SPRITE_SIZE  =  4    # Hight and width of the game sprites, in cells (see above)
@@ -253,7 +254,7 @@ class Game:
             self.snake.eat()
             BEEP.play(maxtime=10)
             self.place_food()
-            self.score += 1
+            self.score += POINTS
         # Food in front:
         front_position = head_position + self.snake.direction
         if (front_position == self.food.position).all():
