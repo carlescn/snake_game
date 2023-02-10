@@ -21,8 +21,9 @@ BORDER_WIDTH  =  1    # Size of the empty space between cells, in actual pixels
 GRID_WIDTH    = 20    # Width  of the screen, in sprites (see below)
 GRID_HEIGHT   =  9    # Height of the screen, in sprites (see below)
 SCREEN_BORDER =  6    # Size of borders at the edge of the screen, in cells
-BG_COLOR      = pygame.Color((175, 215, 5))    # Color of the background
-CELL_COLOR    = pygame.Color(( 35,  43, 1))    # Color of the "fake pixels"
+CELL_COLOR    = pygame.Color(( 35,  43, 1))    # Color of the "fake pixels" (RGB)
+BG_MAIN_COLOR = pygame.Color((175, 215, 5))    # Main color of the background (RGB)
+BG_EDGE_COLOR = pygame.Color((155, 175, 2))    # Dark color for the background gradient (RGB)
 
 ## Starting position
 START_X         = GRID_WIDTH//2     # Starting X position
@@ -46,13 +47,8 @@ LEVEL_WIDTH  = GRID_WIDTH  * SPRITE_SIZE
 LEVEL_HEIGHT = GRID_HEIGHT * SPRITE_SIZE
 
 
-def check_sprites_size(sprites_list, height, width):
-    for sprite in sprites_list:
-        assert np.array(sprite).shape[0] == height
-        assert np.array(sprite).shape[1] == width
-
-
 class Cell:
+# pylint:disable=too-few-public-methods
     def __init__(self, rect_x, rect_y):
         rect_width  = CELL_WIDTH  - BORDER_WIDTH
         rect_height = CELL_HEIGHT - BORDER_WIDTH
@@ -61,7 +57,7 @@ class Cell:
         self.rect = pygame.Rect(rect_x, rect_y, rect_width, rect_height)
 
     def draw(self):
-        pygame.draw.rect(screen, CELL_COLOR, self.rect)
+        pygame.draw.rect(SCREEN, CELL_COLOR, self.rect)
 
 
 class Sprite:
@@ -308,10 +304,25 @@ class Hud:
             Sprite(sprite, position).draw(hud = True)
 
 
+def _check_sprites_size(sprites_list, height, width):
+    for sprite in sprites_list:
+        assert np.array(sprite).shape[0] == height
+        assert np.array(sprite).shape[1] == width
+
+def _draw_background():
+    """ Draws a rectangle the size of the screen with a gradient at the edges """
+    size = SCREEN.get_width() / 32
+    surface = pygame.Surface((size, size))
+    pygame.draw.rect(surface, BG_EDGE_COLOR, pygame.Rect(0, 0, size, size))
+    pygame.draw.rect(surface, BG_MAIN_COLOR, pygame.Rect(1, 1, size - 2, size - 2))
+    surface = pygame.transform.smoothscale(surface, (SCREEN.get_width(), SCREEN.get_height()))
+    SCREEN.blit(surface, pygame.Rect(0, 0, SCREEN.get_width(), SCREEN.get_height()))
+
+
 if __name__ == "__main__":
     # pylint:disable=invalid-name  # doesn't like lower case variables
-    check_sprites_size(sprites.game_sprites, SPRITE_SIZE, SPRITE_SIZE)
-    check_sprites_size(sprites.number_sprites, HUD_SPRITE_H, HUD_SPRITE_W)
+    _check_sprites_size(sprites.game_sprites, SPRITE_SIZE, SPRITE_SIZE)
+    _check_sprites_size(sprites.number_sprites, HUD_SPRITE_H, HUD_SPRITE_W)
 
     pygame.init()
     pygame.display.set_caption("Snake")
@@ -320,7 +331,7 @@ if __name__ == "__main__":
 
     screen_width  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*SCREEN_BORDER)
     screen_height = CELL_HEIGHT * (LEVEL_HEIGHT + 2*SCREEN_BORDER + HUD_BAR)
-    screen = pygame.display.set_mode((screen_width, screen_height))
+    SCREEN = pygame.display.set_mode((screen_width, screen_height))
 
     clock  = pygame.time.Clock()
     game   = Game()
@@ -337,7 +348,7 @@ if __name__ == "__main__":
             if event.type == timer:
                 game.update()
 
-        screen.fill(BG_COLOR)
+        _draw_background()
         game.draw()
         pygame.display.update()
         clock.tick(60)
