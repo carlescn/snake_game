@@ -32,7 +32,8 @@ START_LENGTH    = 7                 # Starting size
 START_DIRECTION = RIGHT             # Starting direction
 
 ## Difficulty
-GAME_SPEED   = 200    # Milliseconds between game cycles
+GAME_SPEED  = 200    # Milliseconds between game cycles
+WRAP_AROUND = True   # Behavior when touching the edge of the screen. True: wrap around. False: die.
 # END Customize
 
 
@@ -130,11 +131,15 @@ class Snake:
         else:
             self.sections.pop(-1)
 
-        self.sections[0]["direction"] = self.direction
-        new_section = {"position": self.sections[0]["position"] + self.direction,
+        new_position = self.sections[0]["position"] + self.direction
+        if WRAP_AROUND:
+            new_position[0] = new_position[0] % GRID_WIDTH
+            new_position[1] = new_position[1] % GRID_HEIGHT
+        new_section = {"position": new_position,
                        "direction": self.direction,
                        "full": False}
         self.sections.insert(0, new_section)
+        self.sections[1]["direction"] = self.direction
 
     def eat(self):
         self.sections[0]["full"] = True
