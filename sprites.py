@@ -1,6 +1,6 @@
 """ Sprites for the Snake game """
 
-# Game sprites
+# Main sprites
 
 food =         ((0, 1, 0, 0),
                 (1, 0, 1, 0),
@@ -36,6 +36,28 @@ snake_tail =   ((0, 0, 0, 0),
                 (0, 0, 0, 1),
                 (0, 1, 1, 1),
                 (0, 0, 0, 0))
+
+# Bonus sprites
+
+bird=  ((0, 0, 1, 1, 0, 0, 0, 0),
+        (0, 1, 0, 1, 1, 0, 1, 0),
+        (1, 1, 1, 1, 1, 1, 1, 0),
+        (0, 0, 1, 1, 1, 1, 0, 0))
+
+bug  = ((0, 0, 1, 1, 1, 1, 0, 0),
+        (1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 0, 1, 1, 1, 1, 0, 1),
+        (1, 0, 1, 0, 0, 1, 0, 1))
+
+mouse= ((0, 0, 0, 0, 1, 1, 0, 0),
+        (1, 0, 0, 1, 1, 0, 1, 0),
+        (1, 0, 1, 1, 1, 1, 1, 0),
+        (0, 1, 1, 1, 1, 1, 1, 1))
+
+rat =  ((0, 1, 0, 1, 0, 1, 0, 0),
+        (1, 0, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1),
+        (0, 0, 1, 0, 0, 1, 0, 0))
 
 # Number sprites (HUD)
 
@@ -99,5 +121,6 @@ zero = ((0, 1, 1, 1),
         (0, 1, 0, 1),
         (0, 1, 1, 1))
 
-game_sprites = [food, snake_head, snake_mouth, snake_body, snake_full, snake_turn, snake_tail]
+main_sprites = [food, snake_head, snake_mouth, snake_body, snake_full, snake_turn, snake_tail]
+bonus_sprites = [bird, bug, mouse, rat]
 number_sprites = [one, two, three, four, five, six, seven, eight, nine, zero]

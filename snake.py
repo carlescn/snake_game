@@ -34,6 +34,7 @@ START_DIRECTION = RIGHT             # Starting direction
 ## Difficulty
 GAME_SPEED  = 200    # Milliseconds between game cycles
 WRAP_AROUND = True   # Behavior when touching the edge of the screen. True: wrap around. False: die.
+BONUS_TIMER = 20     # Turns until the bonus disappears
 # END Customize
 
 POINTS = GAME_SPEED // 100  # TODO: study the actual scoring system
@@ -101,16 +102,42 @@ class Sprite:
 class Food:
     def __init__(self):
         self.position = None
-        self.move()
+        self.place()
 
-    def move(self):
+    def place(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        x = random.randint(0, GRID_WIDTH - 1)
-        y = random.randint(0, GRID_HEIGHT - 1)
+        x = np.random.randint(0, GRID_WIDTH  - 1)
+        y = np.random.randint(0, GRID_HEIGHT - 1)
         self.position = np.array((x, y))
+
+    def overlaps(self, position):
+        """Return True if position coincides with self.position"""
+        return (position == self.position).all()
 
     def draw(self):
         Sprite(sprites.food, self.position).draw()
+
+
+class Bonus:
+    def __init__(self):
+        self.timer = BONUS_TIMER
+        self.position = None
+        self.place()
+        index = np.random.randint(0, len(sprites.bonus_sprites))          # index is an int
+        self.sprite = sprites.bonus_sprites[index]  # pylint:disable=invalid-sequence-index
+
+    def place(self):
+    # pylint:disable=invalid-name  # doesn't like single letter x, y
+        x = random.randint(0, GRID_WIDTH - 2)
+        y = random.randint(0, GRID_HEIGHT - 1)
+        self.position = np.array((x, y))
+
+    def overlaps(self, position):
+        """Return True if position coincides with self.position (or right sprite)"""
+        return (position == self.position).all() or (position == self.position + RIGHT).all()
+
+    def draw(self):
+        Sprite(self.sprite, self.position).draw()
 
 
 class Snake:
@@ -142,7 +169,16 @@ class Snake:
         self.sections.insert(0, new_section)
         self.sections[1]["direction"] = self.direction
 
+    def overlaps(self, position, check_itself = False):
+        """Return True if position coincides with any section of the snake"""
+        sections = self.sections[1:] if check_itself else self.sections
+        for section in sections:
+            if (position == section["position"]).all():
+                return True
+        return False
+
     def eat(self):
+        self.open_mouth()
         self.sections[0]["full"] = True
 
     def open_mouth(self):
@@ -201,14 +237,17 @@ class Snake:
 
 
 class Game:
+# pylint:disable=too-many-instance-attributes
     def __init__(self):
         self.pause = True
-        self.direction_buffer = []
         self.score = 0
-        self.hud = Hud()
-        self.food = Food()
+        self.hud   = Hud()
         self.snake = Snake()
-        self.place_food()
+        self.food  = Food()
+        self.bonus = Bonus()
+        self.direction_buffer = []
+        self.new_bonus_timer  = 0
+        self.game_over()
 
     def handle_input_key(self, key):
         match key:
@@ -220,11 +259,22 @@ class Game:
         if len(self.direction_buffer) > 0:
             self.pause = False
 
+    def reset_new_bonus_timer(self):
+        self.new_bonus_timer = 5 + np.random.randint(0, 3) # TODO: study actual frequency
+
     def place_food(self):
-        self.food.move()
-        for section in self.snake.sections:
-            if (self.food.position == section["position"]).all():
-                self.place_food()
+        self.food.place()
+        if self.bonus is not None and self.bonus.overlaps(self.food.position):
+            self.place_food()
+        if self.snake.overlaps(self.food.position):
+            self.place_food()
+
+    def place_bonus(self):
+        self.bonus.place()
+        if self.bonus.overlaps(self.food.position) \
+        or self.snake.overlaps(self.bonus.position) \
+        or self.snake.overlaps(self.bonus.position + RIGHT):
+            self.place_bonus()
 
     def change_direction(self):
         if len(self.direction_buffer) == 0:
@@ -245,20 +295,40 @@ class Game:
         if not 0 <= head_position[0] < GRID_WIDTH or not 0 <= head_position[1] < GRID_HEIGHT:
             self.game_over()
         # Collision with body:
-        for section in self.snake.sections[1:]:
-            if (head_position == section["position"]).all():
-                self.game_over()
+        if self.snake.overlaps(head_position, check_itself=True):
+            self.game_over()
         # Collision with food:
-        if (head_position == self.food.position).all():
-            self.snake.open_mouth()
+        if self.food.overlaps(head_position):
             self.snake.eat()
             BEEP.play(maxtime=10)
-            self.place_food()
             self.score += POINTS
-        # Food in front:
+            self.place_food()
+            self.new_bonus_timer -= 1
+        # Collision with bonus:
+        if self.bonus is not None and self.bonus.overlaps(head_position):
+            self.snake.eat()
+            BEEP.play(maxtime=10)
+            self.score += POINTS * self.bonus.timer
+            self.bonus = None
+            self.reset_new_bonus_timer()
+        # Food or bonus in front:
         front_position = head_position + self.snake.direction
-        if (front_position == self.food.position).all():
+        if self.food.overlaps(front_position):
             self.snake.open_mouth()
+        if self.bonus is not None and self.bonus.overlaps(front_position):
+            self.snake.open_mouth()
+
+    def handle_bonus(self):
+        if self.bonus is None:
+            if self.new_bonus_timer == 0 and self.score > 0:
+                self.bonus = Bonus()
+                self.place_bonus()
+        else:
+            if self.bonus.timer == 0:
+                self.bonus = None
+                self.reset_new_bonus_timer()
+            else:
+                self.bonus.timer -= 1
 
     def update(self):
         if self.pause:
@@ -267,18 +337,24 @@ class Game:
         self.change_direction()
         self.snake.move()
         self.check_collisions()
+        self.handle_bonus()
+
+    def game_over(self):
+        self.pause = True
+        self.score = 0
+        self.bonus = None
+        self.reset_new_bonus_timer()
+        self.snake = Snake()
+        self.place_food()
 
     def draw(self):
         self.hud.draw_borders()
         self.hud.draw_score(self.score)
         self.food.draw()
         self.snake.draw()
-
-    def game_over(self):
-        self.pause = True
-        self.score = 0
-        self.snake = Snake()
-        self.place_food()
+        if self.bonus is not None:
+            self.bonus.draw()
+            self.hud.draw_bonus(self.bonus)
 
 
 class Hud:
@@ -293,8 +369,20 @@ class Hud:
             Cell(LEVEL_WIDTH + SCREEN_BORDER + 1, y).draw()
 
     def draw_score(self, score):
+        score_sprites = self._get_number_sprites(score, 4)
+        for i, sprite in enumerate(score_sprites):
+            Sprite(sprite, (i, 0)).draw(hud = True)
+
+    def draw_bonus(self, bonus):
+        bonus_sprite = ((0,) * len(bonus.sprite[0]), *bonus.sprite) # Add a row of zeros to lower it
+        Sprite(bonus_sprite, (GRID_WIDTH - 4, 0)).draw(hud = True)
+        score_sprites = self._get_number_sprites(bonus.timer, 2)
+        for i, sprite in enumerate(score_sprites):
+            Sprite(sprite, (GRID_WIDTH - 2 + i, 0)).draw(hud = True)
+
+    def _get_number_sprites(self, number, digits):
         numbers_sprites = []
-        for digit in str(score).zfill(4)[-4:]:
+        for digit in str(number).zfill(digits)[-digits:]:
             match int(digit):
                 case 1: numbers_sprites += [sprites.one,]
                 case 2: numbers_sprites += [sprites.two,]
@@ -306,13 +394,10 @@ class Hud:
                 case 8: numbers_sprites += [sprites.eight,]
                 case 9: numbers_sprites += [sprites.nine,]
                 case 0: numbers_sprites += [sprites.zero,]
-
-        for i, sprite in enumerate(numbers_sprites):
-            position = np.array((i, 0))
-            Sprite(sprite, position).draw(hud = True)
+        return numbers_sprites
 
 
-def _check_sprites_size(sprites_list, height, width):
+def _check_sprites_size(sprites_list, width, height):
     for sprite in sprites_list:
         assert np.array(sprite).shape[0] == height
         assert np.array(sprite).shape[1] == width
@@ -329,8 +414,9 @@ def _draw_background():
 
 if __name__ == "__main__":
     # pylint:disable=invalid-name  # doesn't like lower case variables
-    _check_sprites_size(sprites.game_sprites, SPRITE_SIZE, SPRITE_SIZE)
-    _check_sprites_size(sprites.number_sprites, HUD_SPRITE_H, HUD_SPRITE_W)
+    _check_sprites_size(sprites.main_sprites, SPRITE_SIZE, SPRITE_SIZE)
+    _check_sprites_size(sprites.bonus_sprites, 2*SPRITE_SIZE, SPRITE_SIZE)
+    _check_sprites_size(sprites.number_sprites, HUD_SPRITE_W, HUD_SPRITE_H)
 
     pygame.init()
     pygame.display.set_caption("Snake")
