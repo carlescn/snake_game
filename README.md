@@ -10,4 +10,4 @@ This the classic Snake game, implemented using Pygame and NumPy arrays.
 
 I tried emulating the look of the game Snake II on old Nokia phones.
 
-![screenshot](screenshots/v0.1.1.png)
+![screenshot](screenshots/latest.png)
