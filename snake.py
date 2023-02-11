@@ -87,15 +87,15 @@ class Sprite:
     def flip_v(self):
         self.sprite = np.flipud(self.sprite)
 
-    def draw(self, hud = False):
+    def draw(self, hud = False, offset = (0, 0)):
         cell_positions = [
             np.array((i, j)) for j, col in enumerate(self.sprite) for i, xy in enumerate(col) if xy
         ]
         sprite_x = self.position[0] * (HUD_SPRITE_W if hud else SPRITE_SIZE)
         sprite_y = self.position[1] * (HUD_SPRITE_H if hud else SPRITE_SIZE)
         for cell_x, cell_y in cell_positions:
-            cell_x += sprite_x + SCREEN_BORDER + (-2 if hud else 0)
-            cell_y += sprite_y + SCREEN_BORDER + (-2 if hud else HUD_BAR)
+            cell_x += sprite_x + SCREEN_BORDER + offset[0] + (-2 if hud else 0)
+            cell_y += sprite_y + SCREEN_BORDER + offset[1] + (-2 if hud else HUD_BAR)
             Cell(cell_x, cell_y).draw()
 
 
@@ -374,11 +374,10 @@ class Hud:
             Sprite(sprite, (i, 0)).draw(hud = True)
 
     def draw_bonus(self, bonus):
-        bonus_sprite = ((0,) * len(bonus.sprite[0]), *bonus.sprite) # Add a row of zeros to lower it
-        Sprite(bonus_sprite, (GRID_WIDTH - 4, 0)).draw(hud = True)
+        Sprite(bonus.sprite, (GRID_WIDTH - 4, 0)).draw(hud = True, offset = (2, 1))
         score_sprites = self._get_number_sprites(bonus.timer, 2)
         for i, sprite in enumerate(score_sprites):
-            Sprite(sprite, (GRID_WIDTH - 2 + i, 0)).draw(hud = True)
+            Sprite(sprite, (GRID_WIDTH - 2 + i, 0)).draw(hud = True, offset = (2, 0))
 
     def _get_number_sprites(self, number, digits):
         numbers_sprites = []
