@@ -1,6 +1,5 @@
 """ An implementation of the Snake game using Pygame and NumPy arrays """
 import asyncio
-import random
 
 import pygame
 import numpy as np
@@ -133,8 +132,8 @@ class Bonus:
 
     def place(self):
     # pylint:disable=invalid-name  # doesn't like single letter x, y
-        x = random.randint(0, GRID_WIDTH - 2)
-        y = random.randint(0, GRID_HEIGHT - 1)
+        x = np.random.randint(0, GRID_WIDTH - 2)
+        y = np.random.randint(0, GRID_HEIGHT - 1)
         self.position = np.array((x, y))
 
     def overlaps(self, position):
