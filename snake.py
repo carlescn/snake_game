@@ -1,6 +1,5 @@
 """ An implementation of the Snake game using Pygame and NumPy arrays """
-
-import sys
+import asyncio
 import random
 
 import pygame
@@ -410,8 +409,22 @@ def _draw_background():
     surface = pygame.transform.smoothscale(surface, (SCREEN.get_width(), SCREEN.get_height()))
     SCREEN.blit(surface, pygame.Rect(0, 0, SCREEN.get_width(), SCREEN.get_height()))
 
+async def main():
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                game.handle_input_key(event.key)
+            if event.type == timer:
+                game.update()
 
-if __name__ == "__main__":
+        _draw_background()
+        game.draw()
+        pygame.display.update()
+        await asyncio.sleep(0)
+
+if __name__=="__main__":
     # pylint:disable=invalid-name  # doesn't like lower case variables
     _check_sprites_size(sprites.main_sprites, SPRITE_SIZE, SPRITE_SIZE)
     _check_sprites_size(sprites.bonus_sprites, 2*SPRITE_SIZE, SPRITE_SIZE)
@@ -430,22 +443,8 @@ if __name__ == "__main__":
     buffer = np.sin(2 * np.pi * np.arange(44100) * 1760 / 44100).astype(np.float32)
     BEEP = pygame.mixer.Sound(buffer)
 
-    clock  = pygame.time.Clock()
     game   = Game()
     timer  = pygame.USEREVENT
     pygame.time.set_timer(timer, GAME_SPEED)
 
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYDOWN:
-                game.handle_input_key(event.key)
-            if event.type == timer:
-                game.update()
-
-        _draw_background()
-        game.draw()
-        pygame.display.update()
-        clock.tick(60)
+    asyncio.run(main())
