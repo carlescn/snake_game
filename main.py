@@ -245,7 +245,7 @@ class Game:
         self.food  = Food()
         self.bonus = Bonus()
         self.direction_buffer = []
-        self.new_bonus_timer  = 0
+        self.next_bonus_timer  = 0
         self.game_over()
 
     def handle_movement(self, direction):
@@ -273,9 +273,9 @@ class Game:
             elif mouse_y > SCREEN_HEIGHT * 2 / 3:
                 self.handle_movement(DOWN)
 
-    def reset_new_bonus_timer(self):
+    def reset_next_bonus_timer(self):
         # TODO: study actual frequency
-        self.new_bonus_timer = 5 + np.random.randint(0, 3)
+        self.next_bonus_timer = int(np.random.normal(5.5, 0.5))
 
     def place_food(self):
         self.food.place()
@@ -318,14 +318,14 @@ class Game:
             BEEP.play(maxtime=10)
             self.score += POINTS
             self.place_food()
-            self.new_bonus_timer -= 1
+            self.next_bonus_timer -= 1
         # Collision with bonus:
         if self.bonus is not None and self.bonus.overlaps(head_position):
             self.snake.eat()
             BEEP.play(maxtime=10)
             self.score += POINTS * self.bonus.timer
             self.bonus = None
-            self.reset_new_bonus_timer()
+            self.reset_next_bonus_timer()
         # Food or bonus in front:
         front_position = head_position + self.snake.direction
         if self.food.overlaps(front_position):
@@ -335,13 +335,13 @@ class Game:
 
     def handle_bonus(self):
         if self.bonus is None:
-            if self.new_bonus_timer == 0 and self.score > 0:
+            if self.next_bonus_timer == 0 and self.score > 0:
                 self.bonus = Bonus()
                 self.place_bonus()
         else:
             if self.bonus.timer == 0:
                 self.bonus = None
-                self.reset_new_bonus_timer()
+                self.reset_next_bonus_timer()
             else:
                 self.bonus.timer -= 1
 
@@ -358,7 +358,7 @@ class Game:
         self.pause = True
         self.score = 0
         self.bonus = None
-        self.reset_new_bonus_timer()
+        self.reset_next_bonus_timer()
         self.snake = Snake()
         self.place_food()
 
