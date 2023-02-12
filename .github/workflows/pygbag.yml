@@ -1,0 +1,22 @@
+
+name: Pygbag Build and Deploy
+on: [workflow_dispatch]
+permissions:
+  contents: write
+jobs:
+  build-pygbag:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Install and Build
+      run: |
+            python -m pip install pygbag
+            python -m pygbag --icon icon.png --title Snake --build $GITHUB_WORKSPACE
+    - name: Deploy
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        branch: gh-pages
+        folder: build/web
