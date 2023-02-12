@@ -248,18 +248,34 @@ class Game:
         self.new_bonus_timer  = 0
         self.game_over()
 
-    def handle_input_key(self, key):
-        match key:
-            case pygame.K_UP   : self.direction_buffer += [UP,]
-            case pygame.K_DOWN : self.direction_buffer += [DOWN,]
-            case pygame.K_LEFT : self.direction_buffer += [LEFT,]
-            case pygame.K_RIGHT: self.direction_buffer += [RIGHT,]
-            case pygame.K_SPACE: self.pause = not self.pause
+    def handle_movement(self, direction):
+        self.direction_buffer += [direction,]
         if len(self.direction_buffer) > 0:
             self.pause = False
 
+    def handle_input_key(self, key):
+        match key:
+            case pygame.K_UP   : self.handle_movement(UP)
+            case pygame.K_DOWN : self.handle_movement(DOWN)
+            case pygame.K_LEFT : self.handle_movement(LEFT)
+            case pygame.K_RIGHT: self.handle_movement(RIGHT)
+            case pygame.K_SPACE: self.pause = not self.pause
+
+    def handle_input_mouse_button(self, button):
+        if button == pygame.BUTTON_LEFT:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            if mouse_x < SCREEN_WIDTH / 3:
+                self.handle_movement(LEFT)
+            elif mouse_x > SCREEN_WIDTH * 3 / 4:
+                self.handle_movement(RIGHT)
+            elif mouse_y < SCREEN_HEIGHT / 3:
+                self.handle_movement(UP)
+            elif mouse_y > SCREEN_HEIGHT * 2 / 3:
+                self.handle_movement(DOWN)
+
     def reset_new_bonus_timer(self):
-        self.new_bonus_timer = 5 + np.random.randint(0, 3) # TODO: study actual frequency
+        # TODO: study actual frequency
+        self.new_bonus_timer = 5 + np.random.randint(0, 3)
 
     def place_food(self):
         self.food.place()
@@ -416,6 +432,8 @@ async def main():
                 pygame.quit()
             if event.type == pygame.KEYDOWN:
                 game.handle_input_key(event.key)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                game.handle_input_mouse_button(event.button)
             if event.type == timer:
                 game.update()
 
@@ -435,9 +453,9 @@ if __name__=="__main__":
     icon = pygame.image.load("icon.png")
     pygame.display.set_icon(icon)
 
-    screen_width  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*SCREEN_BORDER)
-    screen_height = CELL_HEIGHT * (LEVEL_HEIGHT + 2*SCREEN_BORDER + HUD_BAR)
-    SCREEN = pygame.display.set_mode((screen_width, screen_height))
+    SCREEN_WIDTH  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*SCREEN_BORDER)
+    SCREEN_HEIGHT = CELL_HEIGHT * (LEVEL_HEIGHT + 2*SCREEN_BORDER + HUD_BAR)
+    SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
     pygame.mixer.init()
     buffer = np.sin(2 * np.pi * np.arange(44100) * 1760 / 44100).astype(np.float32)
@@ -448,3 +466,4 @@ if __name__=="__main__":
     pygame.time.set_timer(timer, GAME_SPEED)
 
     asyncio.run(main())
+    
