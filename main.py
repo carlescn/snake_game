@@ -63,14 +63,14 @@ class Cell:
 
 
 class Sprite:
-    """ position: np.array(x:int, y:int) """
     def __init__(self, sprite, position, direction = RIGHT):
-        self.position = position
+        self.position = position     # type : np.array(x:int, y:int)
         self.original_sprite = sprite
         self.sprite = None
         self.face(direction)
 
     def face(self, direction):
+        """ Rotate the sprite to face some direction. """
         if (direction == RIGHT).all():
             self.sprite = np.array(self.original_sprite)
         elif (direction == UP).all():
@@ -81,12 +81,18 @@ class Sprite:
             self.sprite = np.rot90(self.original_sprite,3)
 
     def flip_h(self):
+        """ Flip the sprite horizontally (left to right). """
         self.sprite = np.fliplr(self.sprite)
 
     def flip_v(self):
+        """ Flip the sprite vertically (up to down). """
         self.sprite = np.flipud(self.sprite)
 
     def draw(self, hud = False, offset = (0, 0)):
+        """ Convert the sprite to Cells and draw them on the screen.
+        hud = True: draw the sprites on the top bar
+        hud = False: draw the sprites on the main level
+        offset (x, y): offset the drawing position by x and y. """
         cell_positions = [
             np.array((i, j)) for j, col in enumerate(self.sprite) for i, xy in enumerate(col) if xy
         ]
@@ -122,7 +128,7 @@ class Bonus:
         self.timer = BONUS_TIMER
         self.position = None
         self.place()
-        index = np.random.randint(0, len(sprites.bonus_sprites))          # index is an int
+        index = np.random.randint(0, len(sprites.bonus_sprites))         # index is an int:
         self.sprite = sprites.bonus_sprites[index]  # pylint:disable=invalid-sequence-index
 
     def place(self):
@@ -141,20 +147,21 @@ class Bonus:
 
 class Snake:
     def __init__(self):
-        start_position = np.array((START_X, START_Y))
-        positions = [start_position - START_DIRECTION * i for i in np.arange(START_LENGTH)]
-        directions = [START_DIRECTION,] * START_LENGTH
-        full = [False,] * START_LENGTH
-        self.sections = [
-            {"position": p, "direction": d, "full": f}
-            for p, d, f in zip(positions, directions, full)
-            ]
-        self.direction = START_DIRECTION
         self.mouth_open = False
+        self.direction = START_DIRECTION
+        start_position = np.array((START_X, START_Y))
+        positions  = [start_position - START_DIRECTION * i for i in np.arange(START_LENGTH)]
+        directions = [START_DIRECTION,] * START_LENGTH
+        are_full   = [False,] * START_LENGTH
+        self.sections = [
+            {"position": p, "direction": d, "is_full": f}
+            for p, d, f in zip(positions, directions, are_full)
+            ]
 
     def move(self):
-        if self.sections[-1]["full"]:
-            self.sections[-1]["full"] = False
+        """ Move the snake body one step. Grow its tail if last section is full. """
+        if self.sections[-1]["is_full"]:
+            self.sections[-1]["is_full"] = False
         else:
             self.sections.pop(-1)
 
@@ -164,7 +171,7 @@ class Snake:
             new_position[1] = new_position[1] % GRID_HEIGHT
         new_section = {"position": new_position,
                        "direction": self.direction,
-                       "full": False}
+                       "is_full": False}
         self.sections.insert(0, new_section)
         self.sections[1]["direction"] = self.direction
 
@@ -178,7 +185,7 @@ class Snake:
 
     def eat(self):
         self.open_mouth()
-        self.sections[0]["full"] = True
+        self.sections[0]["is_full"] = True
 
     def open_mouth(self):
         self.mouth_open = True
@@ -191,19 +198,22 @@ class Snake:
             sprite.draw()
 
     def _get_sprites(self):
+        """ Return a list of all the snake Sprite objects """
         head = self._get_head_sprite()
         body = self._get_body_sprites()
         tail = self._get_tail_sprite()
         return head + body + tail
 
     def _flip_sprite_if_left_or_down(self, sprite, direction):
-        """ This is only to imitate the Nokia game sprite orientation """
+        """ Flips the sprite orientation to imitate the Nokia Snake II game """
         if (direction == LEFT).all():
             sprite.flip_v()
         elif (direction == DOWN).all():
             sprite.flip_h()
 
     def _get_head_sprite(self):
+        """ Check the head direction and if the mouth is open,
+        return the adequate Sprite object (in a list of length 1)."""
         head = self.sections[0]
         sprite = sprites.snake_mouth if self.mouth_open else sprites.snake_head
         head_sprite = Sprite(sprite, head["position"], head["direction"])
@@ -211,19 +221,23 @@ class Snake:
         return [head_sprite,]
 
     def _get_tail_sprite(self):
+        """ Check the tail direction and if it is full,
+        return the adequate Sprite object (in a list of length 1)."""
         tail = self.sections[-1]
-        sprite = sprites.snake_full if tail["full"] else sprites.snake_tail
+        sprite = sprites.snake_full if tail["is_full"] else sprites.snake_tail
         tail_sprite = Sprite(sprite, tail["position"], tail["direction"])
         self._flip_sprite_if_left_or_down(tail_sprite, tail["direction"])
         return [tail_sprite,]
 
     def _get_body_sprites(self):
+        """ For every body section, check its direction, if it's turning and if it's full,
+        return a list with the adequate Sprite objects."""
         body_sprites = []
         for i, section in enumerate(self.sections[1:-1]):
             section_dir  = section["direction"]
             previous_dir = self.sections[i+2]["direction"]
-            if (section_dir == previous_dir).all() or section["full"]:
-                sprite = sprites.snake_full if section["full"] else sprites.snake_body
+            if (section_dir == previous_dir).all() or section["is_full"]:
+                sprite = sprites.snake_full if section["is_full"] else sprites.snake_body
                 body_sprite = Sprite(sprite, section["position"], section_dir)
                 self._flip_sprite_if_left_or_down(body_sprite, section_dir)
                 body_sprites += [body_sprite,]
@@ -249,11 +263,13 @@ class Game:
         self.game_over()
 
     def handle_movement(self, direction):
+        """ Add last input to the direction buffer. Unpause the game."""
         self.direction_buffer += [direction,]
         if len(self.direction_buffer) > 0:
             self.pause = False
 
     def handle_input_key(self, key):
+        """ Change directions with arrow keys. Pause / unpause the game with space bar. """
         match key:
             case pygame.K_UP   : self.handle_movement(UP)
             case pygame.K_DOWN : self.handle_movement(DOWN)
@@ -262,6 +278,7 @@ class Game:
             case pygame.K_SPACE: self.pause = not self.pause
 
     def handle_input_mouse_button(self, button):
+        """ Change directions by clicking / tapping on the edge of the screen. """
         if button == pygame.BUTTON_LEFT:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             if mouse_x < SCREEN_WIDTH / 3:
@@ -273,11 +290,8 @@ class Game:
             elif mouse_y > SCREEN_HEIGHT * 2 / 3:
                 self.handle_movement(DOWN)
 
-    def reset_next_bonus_timer(self):
-        # TODO: study actual frequency
-        self.next_bonus_timer = int(np.random.normal(5.5, 0.5))
-
     def place_food(self):
+        """ Place food on the screen. Make sure it doesn't overlap any existing sprite. """
         self.food.place()
         if self.bonus is not None and self.bonus.overlaps(self.food.position):
             self.place_food()
@@ -285,13 +299,32 @@ class Game:
             self.place_food()
 
     def place_bonus(self):
+        """ Place bonus on the screen. Make sure it doesn't overlap any existing sprite. """
         self.bonus.place()
         if self.bonus.overlaps(self.food.position) \
         or self.snake.overlaps(self.bonus.position) \
         or self.snake.overlaps(self.bonus.position + RIGHT):
             self.place_bonus()
 
+    def reset_next_bonus_timer(self):
+        # TODO: study actual frequency
+        self.next_bonus_timer = int(np.random.normal(5.5, 0.5))
+
+    def handle_bonus_timers(self):
+        """ Handle bonus timers and create / remove instances. """
+        if self.bonus is None:
+            if self.next_bonus_timer == 0 and self.score > 0:
+                self.bonus = Bonus()
+                self.place_bonus()
+        else:
+            if self.bonus.timer == 0:
+                self.bonus = None
+                self.reset_next_bonus_timer()
+            else:
+                self.bonus.timer -= 1
+
     def change_direction(self):
+        """ Change snake direction using the two last inputs on the direction buffer. """
         if len(self.direction_buffer) == 0:
             return
         if len(self.direction_buffer) > 2:
@@ -305,6 +338,7 @@ class Game:
         self.snake.direction = direction
 
     def check_collisions(self):
+        """ Check collisions with wall / body / food / bonus. """
         head_position = self.snake.sections[0]["position"]
         # Collision with wall:
         if not 0 <= head_position[0] < GRID_WIDTH or not 0 <= head_position[1] < GRID_HEIGHT:
@@ -333,18 +367,6 @@ class Game:
         if self.bonus is not None and self.bonus.overlaps(front_position):
             self.snake.open_mouth()
 
-    def handle_bonus(self):
-        if self.bonus is None:
-            if self.next_bonus_timer == 0 and self.score > 0:
-                self.bonus = Bonus()
-                self.place_bonus()
-        else:
-            if self.bonus.timer == 0:
-                self.bonus = None
-                self.reset_next_bonus_timer()
-            else:
-                self.bonus.timer -= 1
-
     def update(self):
         if self.pause:
             return
@@ -352,9 +374,10 @@ class Game:
         self.change_direction()
         self.snake.move()
         self.check_collisions()
-        self.handle_bonus()
+        self.handle_bonus_timers()
 
     def game_over(self):
+        """ Reset game to initial state. """
         self.pause = True
         self.score = 0
         self.bonus = None
@@ -363,6 +386,7 @@ class Game:
         self.place_food()
 
     def draw(self):
+        """ Draw the HUD and all the game sprites. """
         self.hud.draw_borders()
         self.hud.draw_score(self.score)
         self.food.draw()
@@ -395,6 +419,7 @@ class Hud:
             Sprite(sprite, (GRID_WIDTH - 2 + i, 0)).draw(hud = True, offset = (2, 0))
 
     def _get_number_sprites(self, number, digits):
+        """ Return a list of number Sprite objects for the last n digits of number"""
         numbers_sprites = []
         for digit in str(number).zfill(digits)[-digits:]:
             match int(digit):
@@ -412,12 +437,13 @@ class Hud:
 
 
 def _check_sprites_size(sprites_list, width, height):
+    """ Check that all the sprites conform to their expected size. """
     for sprite in sprites_list:
         assert np.array(sprite).shape[0] == height
         assert np.array(sprite).shape[1] == width
 
 def _draw_background():
-    """ Draws a rectangle the size of the screen with a gradient at the edges """
+    """ Draw a rectangle the size of the screen with a gradient at the edges. """
     size = SCREEN.get_width() / 32
     surface = pygame.Surface((size, size))
     pygame.draw.rect(surface, BG_EDGE_COLOR, pygame.Rect(0, 0, size, size))
@@ -426,6 +452,7 @@ def _draw_background():
     SCREEN.blit(surface, pygame.Rect(0, 0, SCREEN.get_width(), SCREEN.get_height()))
 
 async def main():
+    """ Handle the game loop. """
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -434,7 +461,7 @@ async def main():
                 game.handle_input_key(event.key)
             if event.type == pygame.MOUSEBUTTONDOWN:
                 game.handle_input_mouse_button(event.button)
-            if event.type == timer:
+            if event.type == TIMER:
                 game.update()
 
         _draw_background()
@@ -443,27 +470,27 @@ async def main():
         await asyncio.sleep(0)
 
 if __name__=="__main__":
-    # pylint:disable=invalid-name  # doesn't like lower case variables
     _check_sprites_size(sprites.main_sprites, SPRITE_SIZE, SPRITE_SIZE)
     _check_sprites_size(sprites.bonus_sprites, 2*SPRITE_SIZE, SPRITE_SIZE)
     _check_sprites_size(sprites.number_sprites, HUD_SPRITE_W, HUD_SPRITE_H)
 
     pygame.init()
+    pygame.mixer.init()
+
     pygame.display.set_caption("Snake")
-    icon = pygame.image.load("icon.png")
-    pygame.display.set_icon(icon)
+    pygame.display.set_icon(pygame.image.load("icon.png"))
 
     SCREEN_WIDTH  = CELL_WIDTH  * (LEVEL_WIDTH  + 2*SCREEN_BORDER)
     SCREEN_HEIGHT = CELL_HEIGHT * (LEVEL_HEIGHT + 2*SCREEN_BORDER + HUD_BAR)
     SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
-    pygame.mixer.init()
     buffer = np.sin(2 * np.pi * np.arange(44100) * 1760 / 44100).astype(np.float32)
     BEEP = pygame.mixer.Sound(buffer)
 
-    game   = Game()
-    timer  = pygame.USEREVENT
-    pygame.time.set_timer(timer, GAME_SPEED)
+    TIMER = pygame.USEREVENT
+    pygame.time.set_timer(TIMER, GAME_SPEED)
+
+    game = Game()
 
     asyncio.run(main())
     
